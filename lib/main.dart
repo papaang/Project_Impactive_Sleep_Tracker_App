@@ -1076,15 +1076,35 @@ class _EventScreenState extends State<EventScreen> {
               actions: [
                 TextButton(onPressed: ()=>Navigator.pop(context), child: Text('Cancel')),
                 TextButton(onPressed: () {
-                   awakenings = int.tryParse(countCtrl.text) ?? 0;
-                   awakeMins = int.tryParse(durCtrl.text) ?? 0;
+                    awakenings = int.tryParse(countCtrl.text) ?? 0;
+                    awakeMins = int.tryParse(durCtrl.text) ?? 0;
+
+                    // Checking for incorrect order of sleep entry times
+                    if (fellAsleepTime!.isBefore(bedTime!)) {
+                      if(mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Asleep time cannot be before bed time.')));
+                      }
+                      return;
+                    }
+                    if (wakeTime!.isBefore(fellAsleepTime!)) {
+                      if(mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Wake time cannot be before sleep time.')));
+                      }
+                      return;
+                    }
+                    if (outTime!.isBefore(wakeTime!)) {
+                      if(mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Out of bed time cannot be before wake time.')));
+                      }
+                      return;
+                    }
                    
                    setState(() {
                      _log.sleepLog[index] = SleepEntry(
                        bedTime: bedTime!,
                        wakeTime: wakeTime!,
                        fellAsleepTime: fellAsleepTime!,
-                       outOfBedTime: outTime,
+                       outOfBedTime: outTime!,
                        awakeningsCount: awakenings,
                        awakeDurationMinutes: awakeMins
                      );
@@ -1106,18 +1126,31 @@ class _EventScreenState extends State<EventScreen> {
     DateTime? bedTime = await _selectDateTime(now, helpText: "Select Bed Time");
     if (bedTime == null) return;
 
-    DateTime? asleepTime = await _selectDateTime(bedTime, helpText: "Select Asleep Time");
-    if (asleepTime == null) return;
+    DateTime? fellAsleepTime = await _selectDateTime(bedTime, helpText: "Select Asleep Time");
+    if (fellAsleepTime == null) return;
 
-    DateTime? wakeTime = await _selectDateTime(asleepTime.add(Duration(hours: 8)), helpText: "Select Wake Time");
+    DateTime? wakeTime = await _selectDateTime(fellAsleepTime.add(Duration(hours: 8)), helpText: "Select Wake Time");
     if (wakeTime == null) return;
     
     DateTime? outTime = await _selectDateTime(wakeTime, helpText: "Select Out of Bed Time");
     if (outTime == null) return;
 
-    if (wakeTime.isBefore(bedTime)) {
+    // Checking for incorrect order of sleep entry times
+    if (fellAsleepTime.isBefore(bedTime)) {
        if(mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Wake time cannot be before bed time.')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Asleep time cannot be before bed time.')));
+       }
+       return;
+    }
+    if (wakeTime.isBefore(fellAsleepTime)) {
+       if(mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Wake time cannot be before sleep time.')));
+       }
+       return;
+    }
+    if (outTime.isBefore(wakeTime)) {
+       if(mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Out of bed time cannot be before wake time.')));
        }
        return;
     }
@@ -1126,7 +1159,7 @@ class _EventScreenState extends State<EventScreen> {
       _log.sleepLog.add(SleepEntry(
         bedTime: bedTime,
         wakeTime: wakeTime,
-        fellAsleepTime: asleepTime,
+        fellAsleepTime: fellAsleepTime,
         outOfBedTime: outTime
       ));
     });
