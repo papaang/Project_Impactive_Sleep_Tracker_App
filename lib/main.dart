@@ -496,6 +496,13 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadTodayLog();
   }
 
+  String _formatHoursToHHhMMm(double hours) {
+  // format hours as {HH}h{MM}m
+  int h = hours.floor();
+  int m = ((hours - h) * 60).round();
+  return '${h.toString().padLeft(2, '0')}h${m.toString().padLeft(2, '0')}m';
+  }
+
   Future<void> _loadTodayLog() async {
     try {
       setState(() => _isLoading = true);
@@ -515,7 +522,7 @@ class _HomeScreenState extends State<HomeScreen> {
           int sessions = log.sleepLog.length;
           double totalHours = log.totalSleepHours;
           if (sessions > 0) {
-            _sleepMessage = "Logged $sessions sleep session(s).\nTotal: ${totalHours.toStringAsFixed(1)} hours.";
+            _sleepMessage = "Logged $sessions sleep session(s).\nTotal: ${_formatHoursToHHhMMm(totalHours)}";
           } else {
             _sleepMessage = "Welcome! Tap 'Going to sleep' to start.";
           }
@@ -606,7 +613,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
        int sessions = _todayLog.sleepLog.length;
        double totalHours = _todayLog.totalSleepHours;
-       _sleepMessage = "Logged $sessions sleep session(s).\nTotal: ${totalHours.toStringAsFixed(1)} hours.";
+       _sleepMessage = "Logged $sessions sleep session(s).\nTotal: ${_formatHoursToHHhMMm(totalHours)}";
     });
 
     await _logService.saveDailyLog(today, _todayLog);
@@ -778,6 +785,13 @@ class _StatsScreenState extends State<StatsScreen> {
   Map<DateTime, double> _weeklySleepData = {};
   bool _isLoading = true;
 
+  String _formatHoursToHHhMM(double hours) {
+    // format hours as {HH}h{MM}
+    int h = hours.floor();
+    int m = ((hours - h) * 60).round();
+    return '${h.toString().padLeft(2, '0')}h${m.toString().padLeft(2, '0')}';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -831,7 +845,13 @@ class _StatsScreenState extends State<StatsScreen> {
                         maxY: 16, // Assume max 16 hours for scale
                         barTouchData: BarTouchData(
                           touchTooltipData: BarTouchTooltipData(
-                           // tooltipBgColor: Colors.blueGrey, 
+                            tooltipBgColor: Colors.blueGrey,
+                            getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                              return BarTooltipItem(
+                                _formatHoursToHHhMM(rod.toY),
+                                const TextStyle(color: Colors.white),
+                              );
+                            },
                           ),
                         ),
                         titlesData: FlTitlesData(
