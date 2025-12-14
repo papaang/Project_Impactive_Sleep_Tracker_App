@@ -59,6 +59,28 @@ enum DayType {
   }
 }
 
+enum SleepLocation {
+  bed,
+  couch,
+  inTransit;
+
+  String get displayName {
+    switch (this) {
+      case SleepLocation.bed: return '🛏️ Bed';
+      case SleepLocation.couch: return '🛋️ Couch';
+      case SleepLocation.inTransit: return '🚃 In Transit';
+    }
+  }
+
+  static SleepLocation fromString(String? locationString) {
+    if (locationString == null) return SleepLocation.bed;
+    for (SleepLocation location in SleepLocation.values) {
+      if (location.name == locationString) return location;
+    }
+    return SleepLocation.bed;
+  }
+}
+
 class SubstanceEntry {
   String name;
   String amount;
@@ -107,9 +129,10 @@ class SleepEntry {
   DateTime wakeTime;
   DateTime fellAsleepTime;
   DateTime? outOfBedTime;
-  
+
   int awakeningsCount;
   int awakeDurationMinutes;
+  SleepLocation sleepLocation;
 
   SleepEntry({
     required this.bedTime,
@@ -117,7 +140,8 @@ class SleepEntry {
     required this.fellAsleepTime,
     this.outOfBedTime,
     this.awakeningsCount = 0,
-    this.awakeDurationMinutes = 0, 
+    this.awakeDurationMinutes = 0,
+    this.sleepLocation = SleepLocation.bed,
   });
 
   Map<String, dynamic> toJson() => {
@@ -127,20 +151,22 @@ class SleepEntry {
         'outOfBedTime': outOfBedTime?.toIso8601String(),
         'awakeningsCount': awakeningsCount,
         'awakeDurationMinutes': awakeDurationMinutes,
+        'sleepLocation': sleepLocation.name,
       };
 
   factory SleepEntry.fromJson(Map<String, dynamic> json) {
     return SleepEntry(
         bedTime: DateTime.parse(json['bedTime']),
         wakeTime: DateTime.parse(json['wakeTime']),
-        fellAsleepTime: json['fellAsleepTime'] != null 
-            ? DateTime.parse(json['fellAsleepTime']) 
+        fellAsleepTime: json['fellAsleepTime'] != null
+            ? DateTime.parse(json['fellAsleepTime'])
             : DateTime.parse(json['bedTime']),
-        outOfBedTime: json['outOfBedTime'] != null 
-            ? DateTime.parse(json['outOfBedTime']) 
+        outOfBedTime: json['outOfBedTime'] != null
+            ? DateTime.parse(json['outOfBedTime'])
             : null,
         awakeningsCount: json['awakeningsCount'] ?? 0,
         awakeDurationMinutes: json['awakeDurationMinutes'] ?? 0,
+        sleepLocation: SleepLocation.fromString(json['sleepLocation']),
       );
   }
       
@@ -362,7 +388,7 @@ class LogService {
              lastOutTime = DateFormat('HH:mm').format(e.outOfBedTime!);
           }
 
-          String base = "${DateFormat('HH:mm').format(e.bedTime)}-${DateFormat('HH:mm').format(e.wakeTime)}";
+          String base = "${DateFormat('HH:mm').format(e.bedTime)}-${DateFormat('HH:mm').format(e.wakeTime)} (${e.sleepLocation.displayName})";
           return "$base (Lat: ${e.sleepLatencyMinutes}m, Awake: ${e.awakeDurationMinutes}m/${e.awakeningsCount}x)";
         }).join(" | ");
 
@@ -1064,6 +1090,7 @@ class _EventScreenState extends State<EventScreen> {
     DateTime? outTime = entry.outOfBedTime;
     int awakenings = entry.awakeningsCount;
     int awakeMins = entry.awakeDurationMinutes;
+    SleepLocation sleepLocation = entry.sleepLocation;
 
     await showDialog(
       context: context,
@@ -1100,7 +1127,20 @@ class _EventScreenState extends State<EventScreen> {
                       controller: durCtrl,
                       decoration: InputDecoration(labelText: 'Total Awake Time (mins)'),
                       keyboardType: TextInputType.number,
-                    )
+                    ),
+                    ListTile(title: Text('Location: ${sleepLocation.displayName}'), onTap: () async {
+                      final SleepLocation? selected = await showDialog<SleepLocation>(
+                        context: context,
+                        builder: (context) => SimpleDialog(
+                          title: Text('Select Sleep Location'),
+                          children: SleepLocation.values.map((loc) => SimpleDialogOption(
+                            onPressed: () => Navigator.pop(context, loc),
+                            child: Text(loc.displayName),
+                          )).toList(),
+                        ),
+                      );
+                      if (selected != null) setDialogState(() => sleepLocation = selected);
+                    }),
                   ],
                 ),
               ),
@@ -1129,7 +1169,7 @@ class _EventScreenState extends State<EventScreen> {
                       }
                       return;
                     }
-                   
+
                    setState(() {
                      _log.sleepLog[index] = SleepEntry(
                        bedTime: bedTime!,
@@ -1137,7 +1177,8 @@ class _EventScreenState extends State<EventScreen> {
                        fellAsleepTime: fellAsleepTime!,
                        outOfBedTime: outTime!,
                        awakeningsCount: awakenings,
-                       awakeDurationMinutes: awakeMins
+                       awakeDurationMinutes: awakeMins,
+                       sleepLocation: sleepLocation,
                      );
                    });
                    _logService.saveDailyLog(widget.date, _log);
@@ -1153,7 +1194,8 @@ class _EventScreenState extends State<EventScreen> {
 
   Future<void> _addSleepEntry() async {
     DateTime now = DateTime.now();
-    
+    SleepLocation sleepLocation = SleepLocation.bed;
+
     DateTime? bedTime = await _selectDateTime(now, helpText: "Select Bed Time");
     if (bedTime == null) return;
 
@@ -1162,9 +1204,21 @@ class _EventScreenState extends State<EventScreen> {
 
     DateTime? wakeTime = await _selectDateTime(fellAsleepTime.add(Duration(hours: 8)), helpText: "Select Wake Time");
     if (wakeTime == null) return;
-    
+
     DateTime? outTime = await _selectDateTime(wakeTime, helpText: "Select Out of Bed Time");
     if (outTime == null) return;
+
+    final SleepLocation? selectedLocation = await showDialog<SleepLocation>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: Text('Select Sleep Location'),
+        children: SleepLocation.values.map((loc) => SimpleDialogOption(
+          onPressed: () => Navigator.pop(context, loc),
+          child: Text(loc.displayName),
+        )).toList(),
+      ),
+    );
+    if (selectedLocation != null) sleepLocation = selectedLocation;
 
     // Checking for incorrect order of sleep entry times
     if (fellAsleepTime.isBefore(bedTime)) {
@@ -1191,7 +1245,8 @@ class _EventScreenState extends State<EventScreen> {
         bedTime: bedTime,
         wakeTime: wakeTime,
         fellAsleepTime: fellAsleepTime,
-        outOfBedTime: outTime
+        outOfBedTime: outTime,
+        sleepLocation: sleepLocation,
       ));
     });
     await _logService.saveDailyLog(widget.date, _log);
