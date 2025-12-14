@@ -657,6 +657,37 @@ class _HomeScreenState extends State<HomeScreen> {
               onTap: () => Navigator.pop(context),
             ),
             ListTile(
+              leading: Icon(Icons.add_task_outlined),
+              title: Text('Today\'s Events'),
+              onTap: () {
+                final now = DateTime.now();
+                final today = DateTime(now.year, now.month, now.day);
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => EventScreen(date: today),
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.leaderboard_outlined),
+              title: Text('Statistics'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const StatsScreen()));
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.calendar_month_outlined),
+              title: Text('Past Entries Calendar'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const CalendarScreen()));
+              },
+            ),
+            ListTile(
               leading: Icon(Icons.settings_outlined),
               title: Text('Settings'),
               onTap: () {
