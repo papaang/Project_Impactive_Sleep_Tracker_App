@@ -8,35 +8,193 @@ import 'package:csv/csv.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:collection/collection.dart';
 
 // -------------------------------------------------------------------
-// --- 1. Enums and Data Models ---
+// --- 1. Dynamic Categories and Data Models ---
 // -------------------------------------------------------------------
 
-enum DayType {
-  work,
-  relax,
-  travel,
-  social,
-  other;
+class Category {
+  final String id;
+  final String name;
+  final String iconName;
+  final String colorHex;
 
+  Category({
+    required this.id,
+    required this.name,
+    required this.iconName,
+    required this.colorHex,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'iconName': iconName,
+    'colorHex': colorHex,
+  };
+
+  factory Category.fromJson(Map<String, dynamic> json) => Category(
+    id: json['id'],
+    name: json['name'],
+    iconName: json['iconName'],
+    colorHex: json['colorHex'],
+  );
+
+  IconData get icon {
+    switch (iconName) {
+      case 'work_outline': return Icons.work_outline;
+      case 'self_improvement_outlined': return Icons.self_improvement_outlined;
+      case 'explore_outlined': return Icons.explore_outlined;
+      case 'people_outline': return Icons.people_outline;
+      case 'bed': return Icons.bed;
+      case 'weekend': return Icons.weekend;
+      case 'directions_car': return Icons.directions_car;
+      case 'medication': return Icons.medication;
+      default: return Icons.wb_sunny_outlined;
+    }
+  }
+
+  Color get color {
+    try {
+      var intColor = int.tryParse(colorHex);
+      if (intColor == null) {
+        return Color.fromARGB(255, 158, 158, 158); // Default color if parsing fails
+      } 
+      else {
+        return Color(intColor);
+      }
+    } catch (e) {
+      return Color.fromARGB(255, 158, 158, 158); // Default color if parsing fails
+    }
+  }
+
+  MaterialColor get materialColor {
+    try {
+      var intColor = int.tryParse(colorHex);
+      if (intColor == null) {
+        return Colors.grey; // Default color if parsing fails
+      } 
+      else {
+        return MaterialColor(intColor, <int, Color>{
+          50: Color(intColor).withAlpha(30),
+          100: Color(intColor).withAlpha(55),
+          200: Color(intColor).withAlpha(80),
+          300: Color(intColor).withAlpha(105),
+          400: Color(intColor).withAlpha(130),
+          500: Color(intColor).withAlpha(155),
+          600: Color(intColor).withAlpha(180),
+          700: Color(intColor).withAlpha(205),
+          800: Color(intColor).withAlpha(230),
+          900: Color(intColor).withAlpha(255),
+        });
+      }
+    } catch (e) {
+      return Colors.grey; // Default color if parsing fails
+    }
+  }
+
+  String get displayName => name;
+}
+
+class CategoryManager {
+  static final CategoryManager _instance = CategoryManager._internal();
+  factory CategoryManager() => _instance;
+  CategoryManager._internal();
+
+  late SharedPreferences _prefs;
+
+  Future<void> init() async {
+    _prefs = await SharedPreferences.getInstance();
+    await _initializeDefaultCategories();
+  }
+
+  Future<void> _initializeDefaultCategories() async {
+    // Day Types
+    if (_prefs.getString('day_types') == null) {
+      final defaultDayTypes = [
+        Category(id: 'work', name: 'Work', iconName: 'work_outline', colorHex: '0xFF1565C0'),
+        Category(id: 'relax', name: 'Relax', iconName: 'self_improvement_outlined', colorHex: '0xFF2E7D32'),
+        Category(id: 'travel', name: 'Travel', iconName: 'explore_outlined', colorHex: '0xFFEF6C00'),
+        Category(id: 'social', name: 'Social', iconName: 'people_outline', colorHex: '0xFF7B1FA2'),
+        // Category(id: 'other', name: 'Other', iconName: 'wb_sunny_outlined', colorHex: '0xFF424242'),
+      ];
+      await saveCategories('day_types', defaultDayTypes);
+    }
+
+    // Sleep Locations
+    if (_prefs.getString('sleep_locations') == null) {
+      final defaultSleepLocations = [
+        Category(id: 'bed', name: 'Bed', iconName: 'bed', colorHex: '0xFF1565C0'),
+        Category(id: 'couch', name: 'Couch', iconName: 'weekend', colorHex: '0xFF2E7D32'),
+        Category(id: 'in_transit', name: 'In Transit', iconName: 'directions_car', colorHex: '0xFFEF6C00'),
+      ];
+      await saveCategories('sleep_locations', defaultSleepLocations);
+    }
+
+  // Medication Types
+  if (_prefs.getString('medication_types') == null) {
+    final defaultMedicationTypes = [
+      Category(id: 'melatonin', name: 'Melatonin', iconName: 'medication', colorHex: '0xFF2E7D32'),
+      Category(id: 'daridorexant', name: 'Daridorexant', iconName: 'medication', colorHex: '0xFF1565C0'),
+      Category(id: 'sertraline', name: 'Sertraline', iconName: 'medication', colorHex: '0xFF7B1FA2'),
+      Category(id: 'lisdexamfetamine', name: 'Lisdexamfetamine', iconName: 'medication', colorHex: '0xFFEF6C00'),
+    ];
+    await saveCategories('medication_types', defaultMedicationTypes);
+  }
+
+  // Exercise Types
+  if (_prefs.getString('exercise_types') == null) {
+    final defaultExerciseTypes = [
+      Category(id: 'light', name: 'Light', iconName: 'directions_walk', colorHex: '0xFF4CAF50'),
+      Category(id: 'medium', name: 'Medium', iconName: 'directions_run', colorHex: '0xFFFF9800'),
+      Category(id: 'heavy', name: 'Heavy', iconName: 'fitness_center', colorHex: '0xFFF44336'),
+    ];
+    await saveCategories('exercise_types', defaultExerciseTypes);
+  }
+
+  // Substance Types
+  if (_prefs.getString('substance_types') == null) {
+    final defaultSubstanceTypes = [
+      Category(id: 'coffee', name: 'Coffee', iconName: 'coffee', colorHex: '0xFF795548'),
+      Category(id: 'tea', name: 'Tea', iconName: 'emoji_food_beverage', colorHex: '0xFF4CAF50'),
+      Category(id: 'cola', name: 'Cola', iconName: 'local_drink', colorHex: '0xFF000000'),
+      Category(id: 'alcohol', name: 'Alcohol', iconName: 'wine_bar', colorHex: '0xFF9C27B0'),
+    ];
+    await saveCategories('substance_types', defaultSubstanceTypes);
+  }
+}
+
+  Future<List<Category>> getCategories(String categoryType) async {
+    final jsonString = _prefs.getString(categoryType);
+    if (jsonString == null) return [];
+    final List<dynamic> jsonList = jsonDecode(jsonString);
+    return jsonList.map((json) => Category.fromJson(json)).toList();
+  }
+
+  Future<void> saveCategories(String categoryType, List<Category> categories) async {
+    final jsonString = jsonEncode(categories.map((c) => c.toJson()).toList());
+    await _prefs.setString(categoryType, jsonString);
+  }
+
+  Future<Category?> getCategoryById(String categoryType, String id) async {
+    final categories = await getCategories(categoryType);
+    return categories.where((c) => c.id == id).firstOrNull;
+  }
+}
+
+// Legacy enum compatibility
+enum DayType { work, relax, travel, social, other }
+enum SleepLocation { bed, couch, inTransit }
+
+extension DayTypeExtension on DayType {
   String get displayName {
     switch (this) {
       case DayType.work: return 'Work';
       case DayType.relax: return 'Relax';
       case DayType.travel: return 'Travel';
       case DayType.social: return 'Social';
-      case DayType.other: default: return 'Other';
-    }
-  }
-
-  Color get color {
-    switch (this) {
-      case DayType.work: return Colors.blue[800]!;
-      case DayType.relax: return Colors.green[800]!;
-      case DayType.travel: return Colors.orange[800]!;
-      case DayType.social: return Colors.purple[800]!;
-      case DayType.other: default: return Colors.grey[700]!;
+      case DayType.other: return 'Other';
     }
   }
 
@@ -46,70 +204,108 @@ enum DayType {
       case DayType.relax: return Icons.self_improvement_outlined;
       case DayType.travel: return Icons.explore_outlined;
       case DayType.social: return Icons.people_outline;
-      case DayType.other: default: return Icons.wb_sunny_outlined;
+      case DayType.other: return Icons.wb_sunny_outlined;
     }
   }
 
-  static DayType? fromString(String? typeString) {
-    if (typeString == null) return null;
-    for (DayType type in DayType.values) {
-      if (type.name == typeString) return type;
+  Color get color {
+    switch (this) {
+      case DayType.work: return Color(0xFF1565C0);
+      case DayType.relax: return Color(0xFF2E7D32);
+      case DayType.travel: return Color(0xFFEF6C00);
+      case DayType.social: return Color(0xFF7B1FA2);
+      case DayType.other: return Color(0xFF424242);
     }
-    return null;
+  }
+
+  static DayType fromString(String? s) {
+    switch (s) {
+      case 'work': return DayType.work;
+      case 'relax': return DayType.relax;
+      case 'travel': return DayType.travel;
+      case 'social': return DayType.social;
+      case 'other': return DayType.other;
+      default: return DayType.other;
+    }
   }
 }
 
-enum SleepLocation {
-  bed,
-  couch,
-  inTransit;
-
+extension SleepLocationExtension on SleepLocation {
   String get displayName {
     switch (this) {
-      case SleepLocation.bed: return '🛏️ Bed';
-      case SleepLocation.couch: return '🛋️ Couch';
-      case SleepLocation.inTransit: return '🚃 In Transit';
+      case SleepLocation.bed: return 'Bed';
+      case SleepLocation.couch: return 'Couch';
+      case SleepLocation.inTransit: return 'In Transit';
     }
   }
 
-  static SleepLocation fromString(String? locationString) {
-    if (locationString == null) return SleepLocation.bed;
-    for (SleepLocation location in SleepLocation.values) {
-      if (location.name == locationString) return location;
+  static SleepLocation fromString(String? s) {
+    switch (s) {
+      case 'bed': return SleepLocation.bed;
+      case 'couch': return SleepLocation.couch;
+      case 'inTransit': return SleepLocation.inTransit;
+      default: return SleepLocation.bed;
     }
-    return SleepLocation.bed;
   }
 }
 
 class SubstanceEntry {
-  String name;
+  String substanceTypeId;
   String amount;
   DateTime time;
 
-  SubstanceEntry({required this.name, required this.amount, required this.time});
+  SubstanceEntry({required this.substanceTypeId, required this.amount, required this.time});
 
-  Map<String, dynamic> toJson() => {'name': name, 'amount': amount, 'time': time.toIso8601String()};
-  factory SubstanceEntry.fromJson(Map<String, dynamic> json) => SubstanceEntry(
-    name: json['name'] ?? 'Coffee', amount: json['amount'], time: DateTime.parse(json['time']));
+  String get name {
+    switch (substanceTypeId) {
+      case 'coffee': return 'Coffee';
+      case 'tea': return 'Tea';
+      case 'cola': return 'Cola';
+      case 'alcohol': return 'Alcohol';
+      default: return substanceTypeId[0].toUpperCase() + substanceTypeId.substring(1);
+    }
+  }
+
+  Map<String, dynamic> toJson() => {'substanceTypeId': substanceTypeId, 'amount': amount, 'time': time.toIso8601String()};
+  factory SubstanceEntry.fromJson(Map<String, dynamic> json) {
+    String id = json['substanceTypeId'] ?? json['name'] ?? 'coffee';
+    // Backward compatibility: map old names to ids
+    if (id == 'Coffee') id = 'coffee';
+    if (id == 'Tea') id = 'tea';
+    if (id == 'Cola') id = 'cola';
+    if (id == 'Alcohol') id = 'alcohol';
+    return SubstanceEntry(
+      substanceTypeId: id, amount: json['amount'], time: DateTime.parse(json['time']));
+  }
 }
 
 class MedicationEntry {
-  String type;
+  String medicationTypeId;
   String dosage;
   DateTime time;
-  MedicationEntry({required this.type, required this.dosage, required this.time});
-  Map<String, dynamic> toJson() => {'type': type, 'dosage': dosage, 'time': time.toIso8601String()};
+  MedicationEntry({required this.medicationTypeId, required this.dosage, required this.time});
+  Map<String, dynamic> toJson() => {'medicationTypeId': medicationTypeId, 'dosage': dosage, 'time': time.toIso8601String()};
   factory MedicationEntry.fromJson(Map<String, dynamic> json) => MedicationEntry(
-        type: json['type'], dosage: json['dosage'] ?? 'N/A', time: DateTime.parse(json['time']));
+        medicationTypeId: json['medicationTypeId'] ?? json['type'], dosage: json['dosage'] ?? 'N/A', time: DateTime.parse(json['time']));
 }
 
 class ExerciseEntry {
-  String type;
+  String exerciseTypeId;
   DateTime startTime;
   DateTime finishTime;
-  ExerciseEntry({required this.type, required this.startTime, required this.finishTime});
+  ExerciseEntry({required this.exerciseTypeId, required this.startTime, required this.finishTime});
+
+  String get type {
+    switch (exerciseTypeId) {
+      case 'light': return 'Light';
+      case 'medium': return 'Medium';
+      case 'heavy': return 'Heavy';
+      default: return exerciseTypeId;
+    }
+  }
+
   Map<String, dynamic> toJson() => {
-        'type': type,
+        'exerciseTypeId': exerciseTypeId,
         'startTime': startTime.toIso8601String(),
         'finishTime': finishTime.toIso8601String()
       };
@@ -117,8 +313,13 @@ class ExerciseEntry {
     if (json['startTime'] == null || json['finishTime'] == null) {
       throw FormatException("Missing time data in exercise entry");
     }
+    String typeId = json['exerciseTypeId'] ?? json['type'] ?? 'light';
+    // Backward compatibility: map old string values to ids
+    if (typeId == 'Light') typeId = 'light';
+    if (typeId == 'Medium') typeId = 'medium';
+    if (typeId == 'Heavy') typeId = 'heavy';
     return ExerciseEntry(
-        type: json['type'],
+        exerciseTypeId: typeId,
         startTime: DateTime.parse(json['startTime']),
         finishTime: DateTime.parse(json['finishTime']));
   }
@@ -132,7 +333,7 @@ class SleepEntry {
 
   int awakeningsCount;
   int awakeDurationMinutes;
-  SleepLocation sleepLocation;
+  String? sleepLocationId;
 
   SleepEntry({
     required this.bedTime,
@@ -141,7 +342,7 @@ class SleepEntry {
     this.outOfBedTime,
     this.awakeningsCount = 0,
     this.awakeDurationMinutes = 0,
-    this.sleepLocation = SleepLocation.bed,
+    this.sleepLocationId = 'bed',
   });
 
   Map<String, dynamic> toJson() => {
@@ -151,7 +352,7 @@ class SleepEntry {
         'outOfBedTime': outOfBedTime?.toIso8601String(),
         'awakeningsCount': awakeningsCount,
         'awakeDurationMinutes': awakeDurationMinutes,
-        'sleepLocation': sleepLocation.name,
+        'sleepLocationId': sleepLocationId,
       };
 
   factory SleepEntry.fromJson(Map<String, dynamic> json) {
@@ -166,27 +367,36 @@ class SleepEntry {
             : null,
         awakeningsCount: json['awakeningsCount'] ?? 0,
         awakeDurationMinutes: json['awakeDurationMinutes'] ?? 0,
-        sleepLocation: SleepLocation.fromString(json['sleepLocation']),
+        sleepLocationId: json['sleepLocationId'] ?? json['sleepLocation'] ?? 'bed',
       );
   }
-      
+
   double get durationHours {
     return wakeTime.difference(fellAsleepTime).inMinutes / 60.0;
   }
-  
+
   int get sleepLatencyMinutes => fellAsleepTime.difference(bedTime).inMinutes;
+
+  String get sleepLocationDisplayName {
+    switch (sleepLocationId) {
+      case 'bed': return 'Bed';
+      case 'couch': return 'Couch';
+      case 'in_transit': return 'In Transit';
+      default: return 'Bed';
+    }
+  }
 }
 
 class DailyLog {
   String? notes;
-  DayType? dayType;
-  
+  String? dayTypeId;
+
   bool isSleeping;
   bool isAwakeInBed;
   DateTime? currentBedTime;
   DateTime? currentWakeTime;
   DateTime? currentFellAsleepTime;
-  
+
   List<SleepEntry> sleepLog;
   List<SubstanceEntry> substanceLog;
   List<MedicationEntry> medicationLog;
@@ -194,7 +404,7 @@ class DailyLog {
 
   DailyLog({
     this.notes,
-    this.dayType,
+    this.dayTypeId,
     this.isSleeping = false,
     this.isAwakeInBed = false,
     this.currentBedTime,
@@ -204,15 +414,16 @@ class DailyLog {
     List<SubstanceEntry>? substanceLog,
     List<MedicationEntry>? medicationLog,
     List<ExerciseEntry>? exerciseLog,
-  })  : this.sleepLog = sleepLog ?? [],
-        this.substanceLog = substanceLog ?? [],
-        this.medicationLog = medicationLog ?? [],
-        this.exerciseLog = exerciseLog ?? [];
+  })  : sleepLog = sleepLog ?? [],
+        substanceLog = substanceLog ?? [],
+        medicationLog = medicationLog ?? [],
+        exerciseLog = exerciseLog ?? [];
+
 
   Map<String, dynamic> toJson() {
     return {
       'notes': notes,
-      'dayType': dayType?.name,
+      'dayTypeId': dayTypeId,
       'isSleeping': isSleeping,
       'isAwakeInBed': isAwakeInBed,
       'currentBedTime': currentBedTime?.toIso8601String(),
@@ -229,7 +440,7 @@ class DailyLog {
     List<SleepEntry> loadedSleepLog = [];
     if (json['sleepLog'] != null) {
       for (var item in json['sleepLog']) {
-        try { loadedSleepLog.add(SleepEntry.fromJson(item)); } catch (e) {}
+        try { loadedSleepLog.add(SleepEntry.fromJson(item)); } catch (e) {'Error parsing sleep entry: $e';}
       }
     }
     if (loadedSleepLog.isEmpty && json['bedTime'] != null && json['wakeTime'] != null) {
@@ -239,34 +450,34 @@ class DailyLog {
            wakeTime: DateTime.parse(json['wakeTime']),
            fellAsleepTime: json['fellAsleepTime'] != null ? DateTime.parse(json['fellAsleepTime']) : DateTime.parse(json['bedTime']),
          ));
-       } catch (e) { }
+       } catch (e) {'Error parsing sleep entry: $e';}
     }
 
     List<SubstanceEntry> loadedSubstanceLog = [];
     var rawSubstance = json['substanceLog'] ?? json['caffeineLog'];
     if (rawSubstance != null) {
       for (var item in rawSubstance) {
-        try { loadedSubstanceLog.add(SubstanceEntry.fromJson(item)); } catch (e) {}
+        try { loadedSubstanceLog.add(SubstanceEntry.fromJson(item)); } catch (e) {'Error parsing substance entry: $e';}
       }
     }
 
     List<MedicationEntry> loadedMedicationLog = [];
     if (json['medicationLog'] != null) {
       for (var item in json['medicationLog']) {
-        try { loadedMedicationLog.add(MedicationEntry.fromJson(item)); } catch (e) {}
+        try { loadedMedicationLog.add(MedicationEntry.fromJson(item)); } catch (e) {'Error parsing medication entry: $e';}
       }
     }
 
     List<ExerciseEntry> loadedExerciseLog = [];
     if (json['exerciseLog'] != null) {
       for (var item in json['exerciseLog']) {
-        try { loadedExerciseLog.add(ExerciseEntry.fromJson(item)); } catch (e) {}
+        try { loadedExerciseLog.add(ExerciseEntry.fromJson(item)); } catch (e) {'Error parsing exercise entry: $e';}
       }
     }
 
     return DailyLog(
       notes: json['notes'],
-      dayType: DayType.fromString(json['dayType']),
+      dayTypeId: json['dayTypeId'] ?? json['dayType'],
       isSleeping: json['isSleeping'] ?? false,
       isAwakeInBed: json['isAwakeInBed'] ?? false,
       currentBedTime: json['currentBedTime'] != null ? DateTime.parse(json['currentBedTime']) : null,
@@ -278,7 +489,7 @@ class DailyLog {
       exerciseLog: loadedExerciseLog,
     );
   }
-  
+
   double get totalSleepHours {
     double total = 0;
     for (var entry in sleepLog) {
@@ -314,7 +525,7 @@ class LogService {
       try {
         return DailyLog.fromJson(jsonDecode(logJson));
       } catch (e) {
-        print("Error parsing log for $date: $e");
+        // print("Error parsing log for $date: $e");
         return DailyLog(); 
       }
     } else {
@@ -340,7 +551,7 @@ class LogService {
         final log = await getDailyLog(utcDate);
         allLogs[utcDate] = log;
       } catch (e) {
-        print("Error parsing log for key $key: $e");
+        // print("Error parsing log for key $key: $e");
       }
     }
     return allLogs;
@@ -353,17 +564,27 @@ class LogService {
   Future<void> exportToCsv(BuildContext context) async {
     try {
       final Map<DateTime, DailyLog> allLogs = await getAllLogs();
-      
-      List<List<dynamic>> rows = [];
-      rows.add([
+      final directory = await getTemporaryDirectory();
+      final exportDir = Directory("${directory.path}/sleep_data_export");
+      await exportDir.create(recursive: true);
+
+      final categoryLogsDir = Directory("${exportDir.path}/category_logs");
+      await categoryLogsDir.create();
+
+      final userCategoriesDir = Directory("${exportDir.path}/user_categories");
+      await userCategoriesDir.create();
+
+      // Main daily log CSV
+      List<List<dynamic>> mainRows = [];
+      mainRows.add([
         "Date",
         "Day Type",
         "Total Sleep (Hours)",
-        "Sleep Latency (Mins)", 
-        "Awakenings (Count)", 
-        "Awake Duration (Mins)", 
-        "Out Of Bed Time", 
-        "Sleep Sessions Detail", 
+        "Sleep Latency (Mins)",
+        "Awakenings (Count)",
+        "Awake Duration (Mins)",
+        "Out Of Bed Time",
+        "Sleep Sessions Detail",
         "Notes",
         "Substance Log",
         "Medication Log",
@@ -371,10 +592,12 @@ class LogService {
       ]);
 
       final sortedKeys = allLogs.keys.toList()..sort();
-      
+      final dayTypes = await CategoryManager().getCategories('day_types');
+
       for (var date in sortedKeys) {
         final log = allLogs[date]!;
-        
+        final category = dayTypes.where((c) => c.id == log.dayTypeId).firstOrNull;
+
         int totalLatency = 0;
         int totalAwakenings = 0;
         int totalAwakeDur = 0;
@@ -388,27 +611,27 @@ class LogService {
              lastOutTime = DateFormat('HH:mm').format(e.outOfBedTime!);
           }
 
-          String base = "${DateFormat('HH:mm').format(e.bedTime)}-${DateFormat('HH:mm').format(e.wakeTime)} (${e.sleepLocation.displayName})";
+          String base = "${DateFormat('HH:mm').format(e.bedTime)}-${DateFormat('HH:mm').format(e.wakeTime)} (${e.sleepLocationDisplayName})";
           return "$base (Lat: ${e.sleepLatencyMinutes}m, Awake: ${e.awakeDurationMinutes}m/${e.awakeningsCount}x)";
         }).join(" | ");
 
-        String substanceStr = log.substanceLog.map((e) => 
+        String substanceStr = log.substanceLog.map((e) =>
           "${e.name}: ${e.amount} @ ${DateFormat('HH:mm').format(e.time)}").join(" | ");
-        
-        String medsStr = log.medicationLog.map((e) => 
-          "${e.type} (${e.dosage}mg) @ ${DateFormat('HH:mm').format(e.time)}").join(" | ");
-          
-        String exerciseStr = log.exerciseLog.map((e) => 
+
+        String medsStr = log.medicationLog.map((e) =>
+          "${e.medicationTypeId} (${e.dosage}mg) @ ${DateFormat('HH:mm').format(e.time)}").join(" | ");
+
+        String exerciseStr = log.exerciseLog.map((e) =>
           "${e.type} (${DateFormat('HH:mm').format(e.startTime)}-${DateFormat('HH:mm').format(e.finishTime)})").join(" | ");
 
-        rows.add([
+        mainRows.add([
           DateFormat('yyyy-MM-dd').format(date),
-          log.dayType?.displayName ?? "",
+          category?.displayName ?? "",
           log.totalSleepHours.toStringAsFixed(2),
-          totalLatency, 
-          totalAwakenings, 
-          totalAwakeDur, 
-          lastOutTime, 
+          totalLatency,
+          totalAwakenings,
+          totalAwakeDur,
+          lastOutTime,
           sleepStr,
           log.notes ?? "",
           substanceStr,
@@ -417,14 +640,143 @@ class LogService {
         ]);
       }
 
-      String csvData = const ListToCsvConverter().convert(rows);
-      final directory = await getTemporaryDirectory();
-      final path = "${directory.path}/sleep_data_export.csv";
-      final File file = File(path);
-      await file.writeAsString(csvData);
+      String mainCsvData = const ListToCsvConverter().convert(mainRows);
+      final mainFile = File("${exportDir.path}/main_daily_log.csv");
+      await mainFile.writeAsString(mainCsvData);
 
-      final xFile = XFile(path);
-      await Share.shareXFiles([xFile], text: 'Here is my sleep data export.');
+      // Sleep log CSV
+      List<List<dynamic>> sleepRows = [];
+      sleepRows.add(["Date", "Bed Time", "Fell Asleep Time", "Wake Time", "Out Of Bed Time", "Duration Hours", "Sleep Latency Mins", "Awakenings Count", "Awake Duration Mins", "Sleep Location"]);
+      for (var date in sortedKeys) {
+        final log = allLogs[date]!;
+        for (var entry in log.sleepLog) {
+          sleepRows.add([
+            DateFormat('yyyy-MM-dd').format(date),
+            DateFormat('HH:mm').format(entry.bedTime),
+            DateFormat('HH:mm').format(entry.fellAsleepTime),
+            DateFormat('HH:mm').format(entry.wakeTime),
+            entry.outOfBedTime != null ? DateFormat('HH:mm').format(entry.outOfBedTime!) : "",
+            entry.durationHours.toStringAsFixed(2),
+            entry.sleepLatencyMinutes,
+            entry.awakeningsCount,
+            entry.awakeDurationMinutes,
+            entry.sleepLocationDisplayName
+          ]);
+        }
+      }
+      String sleepCsvData = const ListToCsvConverter().convert(sleepRows);
+      final sleepFile = File("${categoryLogsDir.path}/sleep_log.csv");
+      await sleepFile.writeAsString(sleepCsvData);
+
+      // Substance log CSV
+      List<List<dynamic>> substanceRows = [];
+      substanceRows.add(["Date", "Substance Type", "Amount", "Time"]);
+      for (var date in sortedKeys) {
+        final log = allLogs[date]!;
+        for (var entry in log.substanceLog) {
+          substanceRows.add([
+            DateFormat('yyyy-MM-dd').format(date),
+            entry.name,
+            entry.amount,
+            DateFormat('HH:mm').format(entry.time)
+          ]);
+        }
+      }
+      String substanceCsvData = const ListToCsvConverter().convert(substanceRows);
+      final substanceFile = File("${categoryLogsDir.path}/substance_log.csv");
+      await substanceFile.writeAsString(substanceCsvData);
+
+      // Medication log CSV
+      List<List<dynamic>> medicationRows = [];
+      medicationRows.add(["Date", "Medication Type", "Dosage", "Time"]);
+      for (var date in sortedKeys) {
+        final log = allLogs[date]!;
+        for (var entry in log.medicationLog) {
+          medicationRows.add([
+            DateFormat('yyyy-MM-dd').format(date),
+            entry.medicationTypeId,
+            entry.dosage,
+            DateFormat('HH:mm').format(entry.time)
+          ]);
+        }
+      }
+      String medicationCsvData = const ListToCsvConverter().convert(medicationRows);
+      final medicationFile = File("${categoryLogsDir.path}/medication_log.csv");
+      await medicationFile.writeAsString(medicationCsvData);
+
+      // Exercise log CSV
+      List<List<dynamic>> exerciseRows = [];
+      exerciseRows.add(["Date", "Exercise Type", "Start Time", "Finish Time", "Duration Mins"]);
+      for (var date in sortedKeys) {
+        final log = allLogs[date]!;
+        for (var entry in log.exerciseLog) {
+          exerciseRows.add([
+            DateFormat('yyyy-MM-dd').format(date),
+            entry.type,
+            DateFormat('HH:mm').format(entry.startTime),
+            DateFormat('HH:mm').format(entry.finishTime),
+            entry.finishTime.difference(entry.startTime).inMinutes
+          ]);
+        }
+      }
+      String exerciseCsvData = const ListToCsvConverter().convert(exerciseRows);
+      final exerciseFile = File("${categoryLogsDir.path}/exercise_log.csv");
+      await exerciseFile.writeAsString(exerciseCsvData);
+
+      // User categories CSVs
+      final categoryTypes = ['day_types', 'sleep_locations', 'medication_types', 'exercise_types', 'substance_types'];
+      for (var type in categoryTypes) {
+        final categories = await CategoryManager().getCategories(type);
+        List<List<dynamic>> catRows = [];
+        catRows.add(["id", "name", "iconName", "colorHex"]);
+        for (var cat in categories) {
+          catRows.add([cat.id, cat.name, cat.iconName, cat.colorHex]);
+        }
+        String catCsvData = const ListToCsvConverter().convert(catRows);
+        final catFile = File("${userCategoriesDir.path}/$type.csv");
+        await catFile.writeAsString(catCsvData);
+      }
+
+      // README.md
+      const readmeContent = '''
+# Sleep Data Export
+
+This export contains your sleep tracking data in a structured folder format.
+
+## Files
+
+- `main_daily_log.csv`: Summary statistics for each day, including total sleep, latency, awakenings, and detailed logs.
+- `category_logs/`: Detailed logs for each category.
+  - `sleep_log.csv`: Individual sleep sessions with times and metrics.
+  - `substance_log.csv`: Caffeine and alcohol consumption entries.
+  - `medication_log.csv`: Medication intake entries.
+  - `exercise_log.csv`: Exercise session entries.
+- `user_categories/`: Definitions of user-defined categories.
+  - `day_types.csv`: Day type categories.
+  - `sleep_locations.csv`: Sleep location categories.
+  - `medication_types.csv`: Medication type categories.
+  - `exercise_types.csv`: Exercise type categories.
+  - `substance_types.csv`: Substance type categories.
+
+## Notes
+
+- All times are in 24-hour format (HH:mm).
+- Dates are in YYYY-MM-DD format.
+- Durations are in hours or minutes as specified.
+- Empty fields indicate no data or N/A.
+''';
+      final readmeFile = File("${exportDir.path}/README.md");
+      await readmeFile.writeAsString(readmeContent);
+
+      // Collect all files
+      final files = <XFile>[];
+      await for (var entity in exportDir.list(recursive: true)) {
+        if (entity is File) {
+          files.add(XFile(entity.path));
+        }
+      }
+
+      await Share.shareXFiles(files, text: 'Here is your sleep data export with folder structure.');
 
     } catch (e) {
       if (context.mounted) {
@@ -443,6 +795,7 @@ class LogService {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await LogService().init();
+  await CategoryManager().init();
   runApp(const MyApp());
 }
 
@@ -512,6 +865,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   DailyLog _todayLog = DailyLog();
+  Category? _dayType;
   String _sleepMessage = "Welcome! Tap 'Going to sleep' to start.";
   bool _isLoading = true;
   final LogService _logService = LogService();
@@ -1008,6 +1362,7 @@ class _EventScreenState extends State<EventScreen> {
   final LogService _logService = LogService();
   late DailyLog _log;
   bool _isLoading = true;
+  List<Category> _dayTypes = [];
 
   @override
   void initState() {
@@ -1019,8 +1374,10 @@ class _EventScreenState extends State<EventScreen> {
     try {
       setState(() => _isLoading = true);
       final log = await _logService.getDailyLog(widget.date);
+      final dayTypes = await CategoryManager().getCategories('day_types');
       setState(() {
         _log = log;
+        _dayTypes = dayTypes;
       });
     } catch (e) {
        // handle error
@@ -1054,19 +1411,19 @@ class _EventScreenState extends State<EventScreen> {
   }
 
   Future<void> _showDayTypeDialog() async {
-    final DayType? selectedType = await showDialog<DayType>(
+    final Category? selectedType = await showDialog<Category>(
       context: context,
       builder: (BuildContext context) {
         return SimpleDialog(
           title: const Text('Select Day Type'),
-          children: DayType.values.map((type) {
+          children: _dayTypes.map((type) {
             return SimpleDialogOption(
               onPressed: () => Navigator.pop(context, type),
               child: Row(
                 children: [
                   Icon(type.icon, color: type.color),
                   const SizedBox(width: 16),
-                  Text(type.displayName),
+                  Text(type.name),
                 ],
               ),
             );
@@ -1077,7 +1434,7 @@ class _EventScreenState extends State<EventScreen> {
 
     if (selectedType != null) {
       setState(() {
-        _log.dayType = selectedType;
+        _log.dayTypeId = selectedType.id;
       });
       await _logService.saveDailyLog(widget.date, _log);
     }
@@ -1090,7 +1447,7 @@ class _EventScreenState extends State<EventScreen> {
     DateTime? outTime = entry.outOfBedTime;
     int awakenings = entry.awakeningsCount;
     int awakeMins = entry.awakeDurationMinutes;
-    SleepLocation sleepLocation = entry.sleepLocation;
+    String sleepLocationId = entry.sleepLocationId ?? 'bed';
 
     await showDialog(
       context: context,
@@ -1128,18 +1485,19 @@ class _EventScreenState extends State<EventScreen> {
                       decoration: InputDecoration(labelText: 'Total Awake Time (mins)'),
                       keyboardType: TextInputType.number,
                     ),
-                    ListTile(title: Text('Location: ${sleepLocation.displayName}'), onTap: () async {
-                      final SleepLocation? selected = await showDialog<SleepLocation>(
+                    ListTile(title: Text('Location: $sleepLocationId'), onTap: () async {
+                      final categories = await CategoryManager().getCategories('sleep_locations');
+                      final Category? selected = await showDialog<Category>(
                         context: context,
                         builder: (context) => SimpleDialog(
                           title: Text('Select Sleep Location'),
-                          children: SleepLocation.values.map((loc) => SimpleDialogOption(
-                            onPressed: () => Navigator.pop(context, loc),
-                            child: Text(loc.displayName),
+                          children: categories.map((cat) => SimpleDialogOption(
+                            onPressed: () => Navigator.pop(context, cat),
+                            child: Text(cat.name),
                           )).toList(),
                         ),
                       );
-                      if (selected != null) setDialogState(() => sleepLocation = selected);
+                      if (selected != null) setDialogState(() => sleepLocationId = selected.id);
                     }),
                   ],
                 ),
@@ -1178,7 +1536,7 @@ class _EventScreenState extends State<EventScreen> {
                        outOfBedTime: outTime!,
                        awakeningsCount: awakenings,
                        awakeDurationMinutes: awakeMins,
-                       sleepLocation: sleepLocation,
+                       sleepLocationId: sleepLocationId,
                      );
                    });
                    _logService.saveDailyLog(widget.date, _log);
@@ -1194,7 +1552,7 @@ class _EventScreenState extends State<EventScreen> {
 
   Future<void> _addSleepEntry() async {
     DateTime now = DateTime.now();
-    SleepLocation sleepLocation = SleepLocation.bed;
+    String sleepLocationId = 'bed';
 
     DateTime? bedTime = await _selectDateTime(now, helpText: "Select Bed Time");
     if (bedTime == null) return;
@@ -1208,17 +1566,18 @@ class _EventScreenState extends State<EventScreen> {
     DateTime? outTime = await _selectDateTime(wakeTime, helpText: "Select Out of Bed Time");
     if (outTime == null) return;
 
-    final SleepLocation? selectedLocation = await showDialog<SleepLocation>(
+    final categories = await CategoryManager().getCategories('sleep_locations');
+    final Category? selected = await showDialog<Category>(
       context: context,
       builder: (context) => SimpleDialog(
         title: Text('Select Sleep Location'),
-        children: SleepLocation.values.map((loc) => SimpleDialogOption(
-          onPressed: () => Navigator.pop(context, loc),
-          child: Text(loc.displayName),
+        children: categories.map((cat) => SimpleDialogOption(
+          onPressed: () => Navigator.pop(context, cat),
+          child: Text(cat.name),
         )).toList(),
       ),
     );
-    if (selectedLocation != null) sleepLocation = selectedLocation;
+    if (selected != null) sleepLocationId = selected.id;
 
     // Checking for incorrect order of sleep entry times
     if (fellAsleepTime.isBefore(bedTime)) {
@@ -1246,7 +1605,7 @@ class _EventScreenState extends State<EventScreen> {
         wakeTime: wakeTime,
         fellAsleepTime: fellAsleepTime,
         outOfBedTime: outTime,
-        sleepLocation: sleepLocation,
+        sleepLocationId: sleepLocationId,
       ));
     });
     await _logService.saveDailyLog(widget.date, _log);
@@ -1324,7 +1683,7 @@ class _EventScreenState extends State<EventScreen> {
                         ),
                       ),
                     );
-                }).toList(),
+                }),
                 
                 const SizedBox(height: 8),
                 OutlinedButton.icon(
@@ -1337,9 +1696,9 @@ class _EventScreenState extends State<EventScreen> {
                 const SizedBox(height: 24),
 
                 _EventButton(
-                  label: _log.dayType?.displayName ?? 'Type of Day',
-                  icon: _log.dayType?.icon ?? Icons.wb_sunny_outlined,
-                  color: _log.dayType?.color ?? Colors.indigo[800]!,
+                  label: _dayTypes.where((c) => c.id == _log.dayTypeId).firstOrNull?.displayName ?? 'Type of Day',
+                  icon: _dayTypes.where((c) => c.id == _log.dayTypeId).firstOrNull?.icon ?? Icons.wb_sunny_outlined,
+                  color: _dayTypes.where((c) => c.id == _log.dayTypeId).firstOrNull?.color ?? Colors.indigo[800]!,
                   onPressed: _showDayTypeDialog,
                 ),
                 const SizedBox(height: 16),
@@ -1509,6 +1868,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   Map<DateTime, DailyLog> _logsByDate = {};
   DateTime _focusedDay = DateTime.now();
   late DateTime _selectedDay;
+  Map<String, Category> _dayTypes = {};
 
   @override
   void initState() {
@@ -1516,6 +1876,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final now = DateTime.now();
     _selectedDay = DateTime.utc(now.year, now.month, now.day);
     _loadAllLogs();
+    _loadDayTypes();
   }
 
   Future<void> _loadAllLogs() async {
@@ -1525,11 +1886,18 @@ class _CalendarScreenState extends State<CalendarScreen> {
     });
   }
 
+  Future<void> _loadDayTypes() async {
+    final types = await CategoryManager().getCategories('day_types');
+    setState(() {
+      _dayTypes = {for (var t in types) t.id: t};
+    });
+  }
+
   List<Object> _getEventsForDay(DateTime day) {
     final utcDay = DateTime.utc(day.year, day.month, day.day);
     final log = _logsByDate[utcDay];
-    if (log != null && log.dayType != null) {
-      return [log.dayType!];
+    if (log != null && log.dayTypeId != null && _dayTypes.containsKey(log.dayTypeId)) {
+      return [_dayTypes[log.dayTypeId]!];
     }
     return [];
   }
@@ -1574,13 +1942,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
             calendarBuilders: CalendarBuilders(
               markerBuilder: (context, day, events) {
                 if (events.isNotEmpty) {
-                  final dayType = events[0] as DayType;
+                  final category = events[0] as Category;
                   return Container(
                     width: 7,
                     height: 7,
                     margin: const EdgeInsets.symmetric(horizontal: 1.5),
                     decoration: BoxDecoration(
-                      color: dayType.color,
+                      color: category.color,
                       shape: BoxShape.circle,
                     ),
                   );
@@ -1628,6 +1996,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
   final LogService _logService = LogService();
   late DailyLog _log;
   bool _isLoading = true;
+  List<Category> _exerciseTypes = [];
 
   @override
   void initState() {
@@ -1639,8 +2008,10 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     try {
       setState(() => _isLoading = true);
       final log = await _logService.getDailyLog(widget.date);
+      final exerciseTypes = await CategoryManager().getCategories('exercise_types');
       setState(() {
         _log = log;
+        _exerciseTypes = exerciseTypes;
       });
     } catch (e) {
        // handle error
@@ -1663,27 +2034,23 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
   }
 
   Future<void> _addExerciseEntry() async {
-    final String? type = await showDialog<String>(
+    final Category? selectedType = await showDialog<Category>(
       context: context,
       builder: (context) => SimpleDialog(
         title: Text('Select Activity Type'),
-        children: [
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(context, 'Light'),
-            child: Text('Light'),
+        children: _exerciseTypes.map((cat) => SimpleDialogOption(
+          onPressed: () => Navigator.pop(context, cat),
+          child: Row(
+            children: [
+              Icon(cat.icon, color: cat.color),
+              const SizedBox(width: 16),
+              Text(cat.name),
+            ],
           ),
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(context, 'Medium'),
-            child: Text('Medium'),
-          ),
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(context, 'Heavy'),
-            child: Text('Heavy'),
-          ),
-        ],
+        )).toList(),
       ),
     );
-    if (type == null) return;
+    if (selectedType == null) return;
 
     final TimeOfDay? startTime = await _showTimePicker(
       TimeOfDay.now(),
@@ -1722,7 +2089,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     }
 
     final newEntry = ExerciseEntry(
-      type: type,
+      exerciseTypeId: selectedType.id,
       startTime: startDateTime,
       finishTime: finishDateTime,
     );
@@ -1831,6 +2198,7 @@ class _CaffeineAlcoholScreenState extends State<CaffeineAlcoholScreen> {
   final LogService _logService = LogService();
   late DailyLog _log;
   bool _isLoading = true;
+  List<Category> _substanceTypes = [];
 
   @override
   void initState() {
@@ -1842,8 +2210,10 @@ class _CaffeineAlcoholScreenState extends State<CaffeineAlcoholScreen> {
     try {
       setState(() => _isLoading = true);
       final log = await _logService.getDailyLog(widget.date);
+      final substanceTypes = await CategoryManager().getCategories('substance_types');
       setState(() {
         _log = log;
+        _substanceTypes = substanceTypes;
       });
     } catch (e) {
        // handle error
@@ -1857,34 +2227,26 @@ class _CaffeineAlcoholScreenState extends State<CaffeineAlcoholScreen> {
   }
 
   Future<void> _addEntry() async {
-    final String? type = await showDialog<String>(
+    final Category? selectedType = await showDialog<Category>(
       context: context,
       builder: (context) => SimpleDialog(
         title: Text('Select Substance'),
-        children: [
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(context, 'Coffee'),
-            child: Row(children: [Icon(Icons.coffee, color: Colors.brown), SizedBox(width: 10), Text('Coffee')]),
+        children: _substanceTypes.map((cat) => SimpleDialogOption(
+          onPressed: () => Navigator.pop(context, cat),
+          child: Row(
+            children: [
+              Icon(cat.icon, color: cat.color),
+              const SizedBox(width: 16),
+              Text(cat.name),
+            ],
           ),
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(context, 'Tea'),
-            child: Row(children: [Icon(Icons.emoji_food_beverage, color: Colors.green), SizedBox(width: 10), Text('Tea')]),
-          ),
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(context, 'Cola'),
-            child: Row(children: [Icon(Icons.local_drink, color: Colors.black87), SizedBox(width: 10), Text('Cola')]),
-          ),
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(context, 'Alcohol'),
-            child: Row(children: [Icon(Icons.wine_bar, color: Colors.purple), SizedBox(width: 10), Text('Alcohol')]),
-          ),
-        ],
+        )).toList(),
       ),
     );
-    if (type == null) return;
+    if (selectedType == null) return;
 
     List<String> amountOptions;
-    if (type == 'Alcohol') {
+    if (selectedType.id == 'alcohol') {
       amountOptions = ['1 drink', '2 drinks', '3 drinks', '4 drinks', '5+ drinks'];
     } else {
       amountOptions = ['One cup', 'Two cups', 'Three cups', 'Four cups'];
@@ -1893,7 +2255,7 @@ class _CaffeineAlcoholScreenState extends State<CaffeineAlcoholScreen> {
     final String? amount = await showDialog<String>(
       context: context,
       builder: (context) => SimpleDialog(
-        title: Text('Select Amount ($type)'),
+        title: Text('Select Amount (${selectedType.name})'),
         children: amountOptions.map((opt) => SimpleDialogOption(
           onPressed: () => Navigator.pop(context, opt),
           child: Text(opt),
@@ -1917,7 +2279,7 @@ class _CaffeineAlcoholScreenState extends State<CaffeineAlcoholScreen> {
       time.minute,
     );
 
-    final newEntry = SubstanceEntry(name: type, amount: amount, time: entryTime);
+    final newEntry = SubstanceEntry(substanceTypeId: selectedType.id, amount: amount, time: entryTime);
     setState(() {
       _log.substanceLog.add(newEntry);
     });
@@ -1929,20 +2291,6 @@ class _CaffeineAlcoholScreenState extends State<CaffeineAlcoholScreen> {
       _log.substanceLog.removeAt(index);
     });
     _saveLog();
-  }
-
-  IconData _getIcon(String name) {
-    if (name == 'Alcohol') return Icons.wine_bar;
-    if (name == 'Tea') return Icons.emoji_food_beverage;
-    if (name == 'Cola') return Icons.local_drink;
-    return Icons.coffee;
-  }
-
-  Color _getColor(String name) {
-    if (name == 'Alcohol') return Colors.purple;
-    if (name == 'Tea') return Colors.green[700]!;
-    if (name == 'Cola') return Colors.black87;
-    return Colors.brown;
   }
 
   @override
@@ -1988,12 +2336,14 @@ class _CaffeineAlcoholScreenState extends State<CaffeineAlcoholScreen> {
                     children: _log.substanceLog.asMap().entries.map((entry) {
                       int idx = entry.key;
                       SubstanceEntry item = entry.value;
+                      final category = _substanceTypes.where((c) => c.id == item.substanceTypeId).firstOrNull;
+                      final displayName = category?.name ?? item.name;
                       return Card(
                         margin: const EdgeInsets.symmetric(vertical: 6),
                         child: ListTile(
-                          leading: Icon(_getIcon(item.name),
-                              color: _getColor(item.name)),
-                          title: Text("${item.name}: ${item.amount}",
+                          leading: Icon(category?.icon ?? Icons.local_drink,
+                              color: category?.color ?? Colors.brown),
+                          title: Text("$displayName: ${item.amount}",
                               style: TextStyle(fontWeight: FontWeight.bold)),
                           subtitle:
                               Text(DateFormat('h:mm a').format(item.time)),
@@ -2030,6 +2380,7 @@ class _MedicationScreenState extends State<MedicationScreen> {
   final LogService _logService = LogService();
   late DailyLog _log;
   bool _isLoading = true;
+  List<Category> _medicationTypes = [];
 
   @override
   void initState() {
@@ -2041,8 +2392,10 @@ class _MedicationScreenState extends State<MedicationScreen> {
     try {
       setState(() => _isLoading = true);
       final log = await _logService.getDailyLog(widget.date);
+      final medicationTypes = await CategoryManager().getCategories('medication_types');
       setState(() {
         _log = log;
+        _medicationTypes = medicationTypes;
       });
     } catch (e) {
        // handle error
@@ -2056,64 +2409,63 @@ class _MedicationScreenState extends State<MedicationScreen> {
   }
 
   Future<void> _addMedicationEntry() async {
-    String? type = await showDialog<String>(
+    final Category? selectedType = await showDialog<Category>(
       context: context,
       builder: (context) => SimpleDialog(
         title: Text('Select Medication'),
         children: [
+          ..._medicationTypes.map((cat) => SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, cat),
+            child: Row(
+              children: [
+                Icon(cat.icon, color: cat.color),
+                const SizedBox(width: 16),
+                Text(cat.name),
+              ],
+            ),
+          )),
           SimpleDialogOption(
-            onPressed: () => Navigator.pop(context, 'Melatonin'),
-            child: Text('Melatonin'),
-          ),
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(context, 'Daridorexant'),
-            child: Text('Daridorexant'),
-          ),
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(context, 'Sertraline'),
-            child: Text('Sertraline'),
-          ),
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(context, 'Lisdexamfetamine'),
-            child: Text('Lisdexamfetamine'),
-          ),
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(context, 'Other'),
+            onPressed: () => Navigator.pop(context, Category(id: 'custom', name: 'Other...', iconName: 'medication', colorHex: '0xFF424242')),
             child: Text('Other...'),
           ),
         ],
       ),
     );
 
-    if (type == null) return;
-
-    if (type == 'Other') {
-      final controller = TextEditingController();
-      type = await showDialog<String>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text('Enter Medication Name'),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: InputDecoration(hintText: 'e.g. Ibuprofen'),
+    String? typeId;
+    if (selectedType != null) {
+      if (selectedType.id == 'custom') {
+        final controller = TextEditingController();
+        final customName = await showDialog<String>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('Enter Medication Name'),
+            content: TextField(
+              controller: controller,
+              autofocus: true,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(hintText: 'e.g. Ibuprofen'),
+            ),
+            actions: [
+              TextButton(
+                child: Text('Cancel'),
+                onPressed: () => Navigator.pop(context),
+              ),
+              TextButton(
+                child: Text('Save'),
+                onPressed: () => Navigator.pop(context, controller.text),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              child: Text('Cancel'),
-              onPressed: () => Navigator.pop(context),
-            ),
-            TextButton(
-              child: Text('Save'),
-              onPressed: () => Navigator.pop(context, controller.text),
-            ),
-          ],
-        ),
-      );
+        );
+        if (customName == null || customName.isEmpty) return;
+        typeId = customName;
+      } else {
+        typeId = selectedType.id;
+      }
+    } else {
+      return;
     }
-
-    if (type == null || type.isEmpty) return;
 
     String? dosage = await showDialog<String>(
         context: context,
@@ -2151,7 +2503,7 @@ class _MedicationScreenState extends State<MedicationScreen> {
       time.hour,
       time.minute,
     );
-    final newEntry = MedicationEntry(type: type, dosage: dosage, time: entryTime);
+    final newEntry = MedicationEntry(medicationTypeId: typeId, dosage: dosage, time: entryTime);
     setState(() {
       _log.medicationLog.add(newEntry);
     });
@@ -2209,12 +2561,14 @@ class _MedicationScreenState extends State<MedicationScreen> {
                         _log.medicationLog.asMap().entries.map((entry) {
                       int idx = entry.key;
                       MedicationEntry item = entry.value;
+                      final category = _medicationTypes.where((c) => c.id == item.medicationTypeId).firstOrNull;
+                      final displayName = category?.name ?? item.medicationTypeId;
                       return Card(
                         margin: const EdgeInsets.symmetric(vertical: 6),
                         child: ListTile(
-                          leading: Icon(Icons.medication_outlined,
-                              color: Colors.green[800]),
-                          title: Text("${item.type} (${item.dosage}mg)",
+                          leading: Icon(category?.icon ?? Icons.medication_outlined,
+                              color: category?.color ?? Colors.green[800]),
+                          title: Text("$displayName (${item.dosage}mg)",
                               style: TextStyle(fontWeight: FontWeight.bold)),
                           subtitle:
                               Text(DateFormat('h:mm a').format(item.time)),
@@ -2274,6 +2628,19 @@ class SettingsScreen extends StatelessWidget {
               ),
               const SizedBox(height: 32),
               
+              // --- CATEGORIES MANAGEMENT BUTTON ---
+              ElevatedButton.icon(
+                icon: Icon(Icons.category_outlined),
+                label: const Text('Manage Categories'),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const CategoryManagementScreen()),
+                  );
+                },
+              ),
+              const SizedBox(height: 20),
+
               // --- CSV EXPORT BUTTON ---
               ElevatedButton.icon(
                 icon: Icon(Icons.download),
@@ -2420,5 +2787,253 @@ class _NotesScreenState extends State<NotesScreen> {
               ),
             ),
     );
+  }
+}
+
+
+
+class CategoryManagementScreen extends StatefulWidget {
+  const CategoryManagementScreen({super.key});
+
+  @override
+  State<CategoryManagementScreen> createState() => _CategoryManagementScreenState();
+}
+
+class _CategoryManagementScreenState extends State<CategoryManagementScreen> with TickerProviderStateMixin {
+  late TabController _tabController;
+  Map<String, List<Category>> _categories = {};
+  final List<String> _categoryTypes = ['day_types', 'sleep_locations', 'medication_types'];
+  final List<String> _categoryTypeName = ['Day Type', 'Sleep Location', 'Medication Type'];
+  final List<String> _categoryTypeNames = ['Day Types', 'Sleep Locations', 'Medication Types'];
+  // final List<String> _categoryTypes = ['day_types', 'sleep_locations', 'medication_types', 'exercise_types'];
+  // final List<String> _categoryTypeName = ['Day Type', 'Sleep Location', 'Medication Type', 'Exercise Type'];
+  // final List<String> _categoryTypeNames = ['Day Types', 'Sleep Locations', 'Medication Types', 'Exercise Types'];
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: _categoryTypes.length, vsync: this);
+    _loadCategories();
+    _tabController.addListener(() => setState(() {}));  
+  }
+
+  Future<void> _loadCategories() async {
+    final dayTypes = await CategoryManager().getCategories('day_types');
+    final sleepLocations = await CategoryManager().getCategories('sleep_locations');
+    final medicationTypes = await CategoryManager().getCategories('medication_types');
+    // final exerciseTypes = await CategoryManager().getCategories('exercise_types');
+    setState(() {
+      _categories = {
+        'day_types': dayTypes,
+        'sleep_locations': sleepLocations,
+        'medication_types': medicationTypes,
+        // 'exercise_types': exerciseTypes,
+      };
+    });
+  }
+
+  Future<void> _showAddEditDialog(String categoryType, {Category? category}) async {
+    final isEdit = category != null;
+    final nameController = TextEditingController(text: isEdit ? category.name : '');
+    String selectedIcon = isEdit ? category.iconName : 'work_outline';
+    String selectedColor = isEdit ? category.colorHex : '0xFF1565C0';
+
+    final result = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(isEdit ? 'Edit Category' : 'Add Category'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: InputDecoration(labelText: 'Name'),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                initialValue: selectedIcon,
+                items: [
+                  'work_outline',
+                  'self_improvement_outlined',
+                  'explore_outlined',
+                  'people_outline',
+                  'bed',
+                  'weekend',
+                  'directions_car',
+                  'medication',
+                  'directions_walk',
+                  'directions_run',
+                  'fitness_center',
+                  'coffee',
+                  'emoji_food_beverage',
+                  'local_drink',
+                  'wine_bar',
+                ].map((icon) => DropdownMenuItem(
+                  value: icon,
+                  child: Row(
+                    children: [
+                      Icon(Category(id: 'dummy', iconName: icon, name: '', colorHex: '0xFF000000').icon),
+                      const SizedBox(width: 8),
+                      Text(icon),
+                    ],
+                  ),
+                )).toList(),
+                onChanged: (value) => selectedIcon = value!,
+                decoration: InputDecoration(labelText: 'Icon'),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                initialValue: selectedColor,
+                items: [
+                  '0xFF1565C0', // blue
+                  '0xFF2E7D32', // green
+                  '0xFFEF6C00', // orange
+                  '0xFF7B1FA2', // purple
+                  '0xFF424242', // grey
+                  '0xFF4CAF50', // light green
+                  '0xFFFF9800', // light orange
+                  '0xFFF44336', // red
+                  '0xFF795548', // brown
+                  '0xFF9C27B0', // pink
+                ].map((color) => DropdownMenuItem(
+                  value: color,
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 20,
+                        height: 20,
+                        color: Color(int.parse(color)),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(color),
+                    ],
+                  ),
+                )).toList(),
+                onChanged: (value) => selectedColor = value!,
+                decoration: InputDecoration(labelText: 'Color'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (nameController.text.isEmpty) return;
+              Navigator.pop(context, {
+                'name': nameController.text,
+                'iconName': selectedIcon,
+                'colorHex': selectedColor,
+              });
+            },
+            child: Text(isEdit ? 'Save' : 'Add'),
+          ),
+        ],
+      ),
+    );
+    if (result != null) {
+      if (isEdit) {
+        // Edit existing
+        final updated = Category(
+          id: category.id,
+          name: result['name']!,
+          iconName: result['iconName']!,
+          colorHex: result['colorHex']!,
+        );
+        final index = _categories[categoryType]!.indexWhere((c) => c.id == category.id);
+        if (index != -1) {
+          _categories[categoryType]![index] = updated;
+          await CategoryManager().saveCategories(categoryType, _categories[categoryType]!);
+          setState(() {});
+        }
+      } else {
+        // Add new
+        final newId = DateTime.now().millisecondsSinceEpoch.toString();
+        final newCategory = Category(
+          id: newId,
+          name: result['name']!,
+          iconName: result['iconName']!,
+          colorHex: result['colorHex']!,
+        );
+        _categories[categoryType]!.add(newCategory);
+        await CategoryManager().saveCategories(categoryType, _categories[categoryType]!);
+        setState(() {});
+      }
+    }
+  }
+
+  Future<void> _deleteCategory(String categoryType, Category category) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete Category'),
+        content: Text('Are you sure you want to delete "${category.name}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      _categories[categoryType]!.removeWhere((c) => c.id == category.id);
+      await CategoryManager().saveCategories(categoryType, _categories[categoryType]!);
+      setState(() {});
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Manage Categories'),
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: _categoryTypeNames.map((name) => Tab(text: name)).toList(),
+          unselectedLabelColor: Color(0xffDDDADA),
+          labelColor: Color(0xffDDDADA),
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: _categoryTypes.map((type) {
+          final cats = _categories[type] ?? [];
+          return ListView.builder(
+            itemCount: cats.length,
+            itemBuilder: (context, index) {
+              final cat = cats[index];
+              return ListTile(
+                leading: Icon(cat.icon, color: cat.materialColor),
+                title: Text(cat.name),
+                trailing: IconButton(
+                  icon: Icon(Icons.delete),
+                  onPressed: () => _deleteCategory(type, cat),
+                ),
+                onTap: () => _showAddEditDialog(type, category: cat),
+              );
+            },
+          );
+        }).toList(),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        icon: Icon(Icons.add),
+        label: Text('New ${_categoryTypeName[_tabController.index]}'),
+        onPressed: () => _showAddEditDialog(_categoryTypes[_tabController.index]),
+      ),
+    );
+  }
+  @override
+  void dispose() {
+    _tabController.removeListener(() {});
+    super.dispose();
   }
 }
