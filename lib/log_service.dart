@@ -6,6 +6,7 @@ import 'package:csv/csv.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
+import 'package:archive/archive.dart';
 import 'models.dart';
 
 // -------------------------------------------------------------------
@@ -69,10 +70,12 @@ class LogService {
   Future<void> clearAllData() async {
     await _prefs.clear();
   }
-
+  
+  // Export to CSV function 
   Future<void> exportToCsv(BuildContext context) async {
     try {
       final Map<DateTime, DailyLog> allLogs = await getAllLogs();
+      // Note that use of temp directory does not work for web apps
       final directory = await getTemporaryDirectory();
       final exportDir = Directory("${directory.path}/sleep_data_export");
       await exportDir.create(recursive: true);
@@ -287,10 +290,40 @@ This export contains your sleep tracking data in a structured folder format.
 
       await Share.shareXFiles(files, text: 'Here is your sleep data export with folder structure.');
 
+      // // Create zip archive
+      // final archive = Archive();
+
+      // // Add all files to the archive
+      // await for (var entity in exportDir.list(recursive: true)) {
+      //   if (entity is File) {
+      //     final fileName = entity.path.replaceFirst('${exportDir.path}/', '');
+      //     final fileBytes = await entity.readAsBytes();
+      //     final archiveFile = ArchiveFile(fileName, fileBytes.length, fileBytes);
+      //     archive.addFile(archiveFile);
+      //   }
+      // }
+
+      // // Encode the archive as a zip
+      // final zipEncoder = ZipEncoder();
+      // final zipData = zipEncoder.encode(archive);
+
+      // // Save the zip file
+      // final zipFileName = 'sleep_data_export_${DateFormat('yyyy-MM-dd_HH-mm-ss').format(DateTime.now())}.zip';
+      // final zipFile = File("${directory.path}/$zipFileName");
+      // await zipFile.writeAsBytes(zipData);
+
+      // // Share the zip file
+      // final params = ShareParams(
+      //   text: 'Here is your sleep data export as a zip file.',
+      //   files: [XFile(zipFile.path)],
+      // );
+      // // TODO: Fix share issue (no zip file appears)
+      // await SharePlus.instance.share(params);
+
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error exporting CSV: $e')),
+          SnackBar(content: Text('Error exporting CSV: $e. Note that use of temp directory does not work on web app.')),
         );
       }
     }

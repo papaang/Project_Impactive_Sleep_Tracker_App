@@ -75,7 +75,8 @@ class _StatsScreenState extends State<StatsScreen> {
                         maxY: 16, // Assume max 16 hours for scale
                         barTouchData: BarTouchData(
                           touchTooltipData: BarTouchTooltipData(
-                            tooltipBgColor: Colors.blueGrey,
+                            // Unsure how to implement this
+                            // tooltipBgColor: Colors.blueGrey,
                             getTooltipItem: (group, groupIndex, rod, rodIndex) {
                               return BarTooltipItem(
                                 _formatHoursToHHhMM(rod.toY),
