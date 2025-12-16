@@ -67,7 +67,14 @@ class LogService {
   }
 
   Future<void> clearAllData() async {
-    await _prefs.clear();
+    // Fix: Only remove log entries (keys starting with 'log_')
+    // This preserves categories (day_types, etc.) so the app doesn't break.
+    final keys = _prefs.getKeys();
+    for (final key in keys) {
+      if (key.startsWith('log_')) {
+        await _prefs.remove(key);
+      }
+    }
   }
 
   Future<void> exportToCsv(BuildContext context) async {
