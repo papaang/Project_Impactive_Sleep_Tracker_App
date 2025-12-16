@@ -7,11 +7,13 @@ import 'package:collection/collection.dart';
 // --- 1. Dynamic Categories and Data Models ---
 // -------------------------------------------------------------------
 
+// define dynamic Category class
 class Category {
-  final String id;
-  final String name;
-  final String iconName;
-  final String colorHex;
+  // class variables
+  final String id; // unique category id
+  final String name; // category display name
+  final String iconName; // icon name from https://fonts.google.com/icons
+  final String colorHex; // color in hexadecimal format '0xAARRGGBB'
 
   Category({
     required this.id,
@@ -34,6 +36,10 @@ class Category {
     colorHex: json['colorHex'],
   );
 
+  // get Icon from iconName
+  // Currently requires switch case for every available icon in 
+  // category screen due to Flutter issue flutter/flutter#145302
+  // https://github.com/flutter/flutter/issues/145302
   IconData get icon {
     switch (iconName) {
       case 'work_outline': return Icons.work_outline;
@@ -44,10 +50,20 @@ class Category {
       case 'weekend': return Icons.weekend;
       case 'directions_car': return Icons.directions_car;
       case 'medication': return Icons.medication;
+      case 'directions_walk': return Icons.directions_walk;
+      case 'directions_run': return Icons.directions_run;
+      case 'fitness_center': return Icons.fitness_center;
+      case 'coffee': return Icons.coffee;
+      case 'emoji_food_beverage': return Icons.emoji_food_beverage;
+      case 'local_drink': return Icons.local_drink;
+      case 'wine_bar': return Icons.wine_bar;
       default: return Icons.wb_sunny_outlined;
     }
   }
 
+  // get Color from colorHex
+  // This is used to display the color dropdown to the user in
+  // the category screen
   Color get color {
     try {
       var intColor = int.tryParse(colorHex);
@@ -62,6 +78,8 @@ class Category {
     }
   }
 
+  // get MaterialColor from colorHex
+  // This is used to assign the icon color
   MaterialColor get materialColor {
     try {
       var intColor = int.tryParse(colorHex);
@@ -69,6 +87,7 @@ class Category {
         return Colors.grey; // Default color if parsing fails
       }
       else {
+        // define shades
         return MaterialColor(intColor, <int, Color>{
           50: Color(intColor).withAlpha(30),
           100: Color(intColor).withAlpha(55),
@@ -86,7 +105,6 @@ class Category {
       return Colors.grey; // Default color if parsing fails
     }
   }
-
   String get displayName => name;
 }
 
@@ -110,6 +128,7 @@ class CategoryManager {
         Category(id: 'relax', name: 'Relax', iconName: 'self_improvement_outlined', colorHex: '0xFF2E7D32'),
         Category(id: 'travel', name: 'Travel', iconName: 'explore_outlined', colorHex: '0xFFEF6C00'),
         Category(id: 'social', name: 'Social', iconName: 'people_outline', colorHex: '0xFF7B1FA2'),
+        // Commented out as "Other" day type category is not useful
         // Category(id: 'other', name: 'Other', iconName: 'wb_sunny_outlined', colorHex: '0xFF424242'),
       ];
       await saveCategories('day_types', defaultDayTypes);
@@ -137,6 +156,7 @@ class CategoryManager {
   }
 
   // Exercise Types
+  // note that exercise type cannot be edited by user in this version
   if (_prefs.getString('exercise_types') == null) {
     final defaultExerciseTypes = [
       Category(id: 'light', name: 'Light', iconName: 'directions_walk', colorHex: '0xFF4CAF50'),
@@ -147,6 +167,8 @@ class CategoryManager {
   }
 
   // Substance Types
+  // note that substance type cannot be edited by user in this version
+  // TODO: plan on removing substance types and only having 1 caffeine counter (#14)
   if (_prefs.getString('substance_types') == null) {
     final defaultSubstanceTypes = [
       Category(id: 'coffee', name: 'Coffee', iconName: 'coffee', colorHex: '0xFF795548'),
@@ -177,6 +199,7 @@ class CategoryManager {
 }
 
 // Legacy enum compatibility
+// TODO: check whether this is necessary
 enum DayType { work, relax, travel, social, other }
 enum SleepLocation { bed, couch, inTransit }
 
@@ -242,6 +265,7 @@ extension SleepLocationExtension on SleepLocation {
   }
 }
 
+// Caffeine or Alcohol entry model
 class SubstanceEntry {
   String substanceTypeId;
   String amount;
@@ -272,6 +296,8 @@ class SubstanceEntry {
   }
 }
 
+// Medication entry model
+// TODO: add pre-filled dosage (#13)
 class MedicationEntry {
   String medicationTypeId;
   String dosage;
@@ -282,6 +308,7 @@ class MedicationEntry {
         medicationTypeId: json['medicationTypeId'] ?? json['type'], dosage: json['dosage'] ?? 'N/A', time: DateTime.parse(json['time']));
 }
 
+// Exercise entry model
 class ExerciseEntry {
   String exerciseTypeId;
   DateTime startTime;
@@ -318,6 +345,7 @@ class ExerciseEntry {
   }
 }
 
+// Sleep entry model
 class SleepEntry {
   DateTime bedTime;
   DateTime wakeTime;
@@ -364,12 +392,15 @@ class SleepEntry {
       );
   }
 
+  // sleep statistic: get sleep duration in hours
   double get durationHours {
     return wakeTime.difference(fellAsleepTime).inMinutes / 60.0;
   }
 
+  // sleep statistic: get sleep latency in minutes
   int get sleepLatencyMinutes => fellAsleepTime.difference(bedTime).inMinutes;
 
+  // TODO: check whether dynamic categories are properly implemented
   String get sleepLocationDisplayName {
     switch (sleepLocationId) {
       case 'bed': return 'Bed';
@@ -380,6 +411,7 @@ class SleepEntry {
   }
 }
 
+// Daily log model for CSV export
 class DailyLog {
   String? notes;
   String? dayTypeId;
@@ -483,6 +515,7 @@ class DailyLog {
     );
   }
 
+  // Summary statistic: total sleep hours over whole day
   double get totalSleepHours {
     double total = 0;
     for (var entry in sleepLog) {
