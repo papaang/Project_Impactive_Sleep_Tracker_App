@@ -14,6 +14,7 @@ import 'medication_screen.dart';
 import 'caffeine_alcohol_screen.dart';
 import 'exercise_screen.dart';
 import 'notes_screen.dart';
+import 'category_management_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -211,18 +212,41 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       builder: (BuildContext context) {
         return SimpleDialog(
           title: const Text('Select Day Type'),
-          children: _dayTypes.map((type) {
-            return SimpleDialogOption(
-              onPressed: () => Navigator.pop(context, type),
+          children: [
+            ..._dayTypes.map((type) {
+              return SimpleDialogOption(
+                onPressed: () => Navigator.pop(context, type),
+                child: Row(
+                  children: [
+                    Icon(type.icon, color: type.color),
+                    const SizedBox(width: 16),
+                    Text(type.name),
+                  ],
+                ),
+              );
+            }),
+            SimpleDialogOption(
+              onPressed: () async {
+                Navigator.pop(context); // Close the dialog
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CategoryManagementScreen()),
+                );
+                // Reload day types after returning from category management
+                final dayTypes = await CategoryManager().getCategories('day_types');
+                setState(() {
+                  _dayTypes = dayTypes;
+                });
+              },
               child: Row(
                 children: [
-                  Icon(type.icon, color: type.color),
+                  Icon(Icons.settings, color: Colors.grey),
                   const SizedBox(width: 16),
-                  Text(type.name),
+                  Text('Manage Categories'),
                 ],
               ),
-            );
-          }).toList(),
+            ),
+          ],
         );
       },
     );
@@ -419,7 +443,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       child: Container(
                         padding: EdgeInsets.symmetric(vertical: 16, horizontal: 20),
                         decoration: BoxDecoration(
-                          color: currentDayType?.color.withOpacity(0.1) ?? Colors.grey[200],
+                          color: currentDayType?.color.withAlpha(26) ?? Colors.grey[200],
                           border: Border.all(
                             color: currentDayType?.color ?? Colors.grey[400]!,
                             width: 1.5,
@@ -574,7 +598,7 @@ class _SquareButton extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: isEnabled ? color.withOpacity(0.1) : Colors.transparent, 
+              color: isEnabled ? color.withAlpha(26) : Colors.transparent, 
               width: 1
             ),
           ),
@@ -584,7 +608,7 @@ class _SquareButton extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: isEnabled ? color.withOpacity(0.1) : Colors.grey[200],
+                  color: isEnabled ? color.withAlpha(26) : Colors.grey[200],
                   shape: BoxShape.circle,
                 ),
                 child: Icon(

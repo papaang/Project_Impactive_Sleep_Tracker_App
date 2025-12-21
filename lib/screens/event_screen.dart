@@ -6,6 +6,7 @@ import 'medication_screen.dart';
 import 'caffeine_alcohol_screen.dart';
 import 'exercise_screen.dart';
 import 'notes_screen.dart';
+import 'category_management_screen.dart';
 
 class EventScreen extends StatefulWidget {
   final DateTime date;
@@ -73,18 +74,41 @@ class _EventScreenState extends State<EventScreen> {
       builder: (BuildContext context) {
         return SimpleDialog(
           title: const Text('Select Day Type'),
-          children: _dayTypes.map((type) {
-            return SimpleDialogOption(
-              onPressed: () => Navigator.pop(context, type),
+          children: [
+            ..._dayTypes.map((type) {
+              return SimpleDialogOption(
+                onPressed: () => Navigator.pop(context, type),
+                child: Row(
+                  children: [
+                    Icon(type.icon, color: type.color),
+                    const SizedBox(width: 16),
+                    Text(type.name),
+                  ],
+                ),
+              );
+            }),
+            SimpleDialogOption(
+              onPressed: () async {
+                Navigator.pop(context); // Close the dialog
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CategoryManagementScreen()),
+                );
+                // Reload day types after returning from category management
+                final dayTypes = await CategoryManager().getCategories('day_types');
+                setState(() {
+                  _dayTypes = dayTypes;
+                });
+              },
               child: Row(
                 children: [
-                  Icon(type.icon, color: type.color),
+                  Icon(Icons.settings, color: Colors.grey),
                   const SizedBox(width: 16),
-                  Text(type.name),
+                  Text('Manage Categories'),
                 ],
               ),
-            );
-          }).toList(),
+            ),
+          ],
         );
       },
     );
@@ -356,6 +380,7 @@ class _EventScreenState extends State<EventScreen> {
                   label: _dayTypes.where((c) => c.id == _log.dayTypeId).firstOrNull?.displayName ?? 'Type of Day',
                   icon: _dayTypes.where((c) => c.id == _log.dayTypeId).firstOrNull?.icon ?? Icons.wb_sunny_outlined,
                   color: _dayTypes.where((c) => c.id == _log.dayTypeId).firstOrNull?.color ?? Colors.indigo[800]!,
+                  backgroundColor: _dayTypes.where((c) => c.id == _log.dayTypeId).firstOrNull?.color.withAlpha(26),
                   onPressed: _showDayTypeDialog,
                 ),
                 const SizedBox(height: 16),
@@ -463,22 +488,31 @@ class _EventButton extends StatelessWidget {
     required this.color,
     required this.onPressed,
     this.subtitle,
+    this.backgroundColor,
   });
   final String label;
   final String? subtitle;
   final IconData icon;
   final Color color;
+  final Color? backgroundColor;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 1.0,
-      child: InkWell(
+    if (backgroundColor != null) {
+      return InkWell(
         onTap: onPressed,
         borderRadius: BorderRadius.circular(12.0),
-        child: Padding(
+        child: Container(
           padding: const EdgeInsets.all(16.0),
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            border: Border.all(
+              color: color,
+              width: 1.5,
+            ),
+            borderRadius: BorderRadius.circular(12.0),
+          ),
           child: Row(
             children: [
               Icon(icon, color: color, size: 28),
@@ -509,7 +543,47 @@ class _EventButton extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
+      );
+    } else {
+      return Card(
+        elevation: 1.0,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(12.0),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              children: [
+                Icon(icon, color: color, size: 28),
+                const SizedBox(width: 16),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: color,
+                      ),
+                    ),
+                    if (subtitle != null)
+                      Text(
+                        subtitle!,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                  ],
+                ),
+                const Spacer(),
+                Icon(Icons.arrow_forward_ios, color: Colors.grey[400], size: 16),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
   }
 }
