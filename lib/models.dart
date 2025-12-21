@@ -151,10 +151,10 @@ class CategoryManager {
   // Medication Types
   if (_prefs.getString('medication_types') == null) {
     final defaultMedicationTypes = [
-      Category(id: 'melatonin', name: 'Melatonin', iconName: 'medication', colorHex: '0xFF2E7D32', defaultDosage: 3),
+      Category(id: 'melatonin', name: 'Melatonin', iconName: 'medication', colorHex: '0xFF2E7D32', defaultDosage: 50),
       Category(id: 'daridorexant', name: 'Daridorexant', iconName: 'medication', colorHex: '0xFF1565C0', defaultDosage: 50),
       Category(id: 'sertraline', name: 'Sertraline', iconName: 'medication', colorHex: '0xFF7B1FA2', defaultDosage: 50),
-      Category(id: 'lisdexamfetamine', name: 'Lisdexamfetamine', iconName: 'medication', colorHex: '0xFFEF6C00', defaultDosage: 30),
+      Category(id: 'lisdexamfetamine', name: 'Lisdexamfetamine', iconName: 'medication', colorHex: '0xFFEF6C00', defaultDosage: 50),
     ];
     await saveCategories('medication_types', defaultMedicationTypes);
   }
@@ -176,9 +176,9 @@ class CategoryManager {
   if (_prefs.getString('substance_types') == null) {
     final defaultSubstanceTypes = [
       Category(id: 'coffee', name: 'Coffee', iconName: 'coffee', colorHex: '0xFF795548'),
-      Category(id: 'tea', name: 'Tea', iconName: 'emoji_food_beverage', colorHex: '0xFF4CAF50'),
-      Category(id: 'cola', name: 'Cola', iconName: 'local_drink', colorHex: '0xFF000000'),
-      Category(id: 'alcohol', name: 'Alcohol', iconName: 'wine_bar', colorHex: '0xFF9C27B0'),
+      // Category(id: 'tea', name: 'Tea', iconName: 'emoji_food_beverage', colorHex: '0xFF4CAF50'),
+      // Category(id: 'cola', name: 'Cola', iconName: 'local_drink', colorHex: '0xFF000000'),
+      // Category(id: 'alcohol', name: 'Alcohol', iconName: 'wine_bar', colorHex: '0xFF9C27B0'),
     ];
     await saveCategories('substance_types', defaultSubstanceTypes);
   }
@@ -275,7 +275,7 @@ class SubstanceEntry {
   String amount;
   DateTime time;
 
-  SubstanceEntry({required this.substanceTypeId, required this.amount, required this.time});
+  SubstanceEntry({this.substanceTypeId = 'coffee', required this.amount, required this.time});
 
   String get name {
     switch (substanceTypeId) {
@@ -404,7 +404,6 @@ class SleepEntry {
   // sleep statistic: get sleep latency in minutes
   int get sleepLatencyMinutes => fellAsleepTime.difference(bedTime).inMinutes;
 
-  // TODO: check whether dynamic categories are properly implemented
   String get sleepLocationDisplayName {
     switch (sleepLocationId) {
       case 'bed': return 'Bed';

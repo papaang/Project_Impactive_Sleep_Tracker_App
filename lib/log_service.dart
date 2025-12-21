@@ -134,14 +134,14 @@ class LogService {
           return "$base (Lat: ${e.sleepLatencyMinutes}m, Awake: ${e.awakeDurationMinutes}m/${e.awakeningsCount}x)";
         }).join(" | ");
 
-        String substanceStr = log.substanceLog.map((e) =>
-          "${e.name}: ${e.amount} @ ${DateFormat('HH:mm').format(e.time)}").join(" | ");
+        // String substanceStr = log.substanceLog.map((e) =>
+        //   "${e.substanceTypeId}: ${e.amount} @ ${DateFormat('HH:mm').format(e.time)}").join(" | ");
 
-        String medsStr = log.medicationLog.map((e) =>
-          "${e.medicationTypeId} (${e.dosage}mg) @ ${DateFormat('HH:mm').format(e.time)}").join(" | ");
+        // String medsStr = log.medicationLog.map((e) =>
+        //   "${e.medicationTypeId} (${e.dosage}mg) @ ${DateFormat('HH:mm').format(e.time)}").join(" | ");
 
-        String exerciseStr = log.exerciseLog.map((e) =>
-          "${e.type} (${DateFormat('HH:mm').format(e.startTime)}-${DateFormat('HH:mm').format(e.finishTime)})").join(" | ");
+        // String exerciseStr = log.exerciseLog.map((e) =>
+        //   "${e.type} (${DateFormat('HH:mm').format(e.startTime)}-${DateFormat('HH:mm').format(e.finishTime)})").join(" | ");
 
         mainRows.add([
           DateFormat('yyyy-MM-dd').format(date),
@@ -153,9 +153,9 @@ class LogService {
           lastOutTime,
           sleepStr,
           log.notes ?? "",
-          substanceStr,
-          medsStr,
-          exerciseStr
+          // substanceStr,
+          // medsStr,
+          // exerciseStr
         ]);
       }
 
@@ -195,7 +195,7 @@ class LogService {
         for (var entry in log.substanceLog) {
           substanceRows.add([
             DateFormat('yyyy-MM-dd').format(date),
-            entry.name,
+            entry.substanceTypeId,
             entry.amount,
             DateFormat('HH:mm').format(entry.time)
           ]);
@@ -264,7 +264,7 @@ This export contains your sleep tracking data in a structured folder format.
 
 ## Files
 
-- `main_daily_log.csv`: Summary statistics for each day, including total sleep, latency, awakenings, and detailed logs.
+- `main_daily_log.csv`: Summary statistics for each day, including total sleep, latency, awakenings, and summary logs.
 - `category_logs/`: Detailed logs for each category.
   - `sleep_log.csv`: Individual sleep sessions with times and metrics.
   - `substance_log.csv`: Caffeine and alcohol consumption entries.

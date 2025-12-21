@@ -492,36 +492,36 @@ class _EventScreenState extends State<EventScreen> {
 }
 
 // class _SleepTimeChip currently unused
-class _SleepTimeChip extends StatelessWidget {
-  const _SleepTimeChip({required this.label, required this.time});
-  final String label;
-  final String time;
+// class _SleepTimeChip extends StatelessWidget {
+//   const _SleepTimeChip({required this.label, required this.time});
+//   final String label;
+//   final String time;
 
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey[600],
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        Text(
-          time,
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.black87,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
-    );
-  }
-}
+//   @override
+//   Widget build(BuildContext context) {
+//     return Row(
+//       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//       children: [
+//         Text(
+//           label,
+//           style: TextStyle(
+//             fontSize: 14,
+//             color: Colors.grey[600],
+//             fontWeight: FontWeight.w600,
+//           ),
+//         ),
+//         Text(
+//           time,
+//           style: TextStyle(
+//             fontSize: 14,
+//             color: Colors.black87,
+//             fontWeight: FontWeight.w600,
+//           ),
+//         ),
+//       ],
+//     );
+//   }
+// }
 
 class _EventButton extends StatelessWidget {
   const _EventButton({
