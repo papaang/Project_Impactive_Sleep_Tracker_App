@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:table_calendar/table_calendar.dart';
 import '../log_service.dart';
 import '../models.dart';
 import 'medication_screen.dart';
@@ -257,7 +258,10 @@ class _EventScreenState extends State<EventScreen> {
     DateTime now = DateTime.now();
     String sleepLocationId = 'bed';
 
-    DateTime? bedTime = await _selectDateTime(now, helpText: "Select Bed Time");
+    // For today's date, default to current time; for past days, default to 10 PM on the selected date
+    DateTime initialBedTime = isSameDay(widget.date, now) ? now : DateTime(widget.date.year, widget.date.month, widget.date.day, 22, 0);
+
+    DateTime? bedTime = await _selectDateTime(initialBedTime, helpText: "Select Bed Time");
     if (bedTime == null) return;
 
     DateTime? fellAsleepTime = await _selectDateTime(bedTime, helpText: "Select Asleep Time");

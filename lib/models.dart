@@ -172,7 +172,6 @@ class CategoryManager {
 
   // Substance Types
   // note that substance type cannot be edited by user in this version
-  // TODO: plan on removing substance types and only having 1 caffeine counter (#14)
   if (_prefs.getString('substance_types') == null) {
     final defaultSubstanceTypes = [
       Category(id: 'coffee', name: 'Coffee', iconName: 'coffee', colorHex: '0xFF795548'),
@@ -301,7 +300,6 @@ class SubstanceEntry {
 }
 
 // Medication entry model
-// TODO: add pre-filled dosage (#13)
 class MedicationEntry {
   String medicationTypeId;
   String dosage;

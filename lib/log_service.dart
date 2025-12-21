@@ -103,11 +103,11 @@ class LogService {
         "Awakenings (Count)",
         "Awake Duration (Mins)",
         "Out Of Bed Time",
-        "Sleep Sessions Detail",
+        "Sleep Sessions Total",
         "Notes",
-        "Substance Log",
-        "Medication Log",
-        "Exercise Log"
+        "Caffeine Total (Cups)",
+        "Meds Log Total (Entries)",
+        "Exercise Total (Mins)"
       ]);
 
       final sortedKeys = allLogs.keys.toList()..sort();
@@ -122,40 +122,39 @@ class LogService {
         int totalAwakeDur = 0;
         String lastOutTime = "";
 
-        String sleepStr = log.sleepLog.map((e) {
+        int sleepSessionsTotal = log.sleepLog.length;
+
+        for (var i = 0; i < log.sleepLog.length; i++) {
+          var e = log.sleepLog[i];
           totalLatency += e.sleepLatencyMinutes;
           totalAwakenings += e.awakeningsCount;
           totalAwakeDur += e.awakeDurationMinutes;
           if (e.outOfBedTime != null) {
-             lastOutTime = DateFormat('HH:mm').format(e.outOfBedTime!);
+            lastOutTime = DateFormat('HH:mm').format(e.outOfBedTime!);
           }
+        }
 
-          String base = "${DateFormat('HH:mm').format(e.bedTime)}-${DateFormat('HH:mm').format(e.wakeTime)} (${e.sleepLocationDisplayName})";
-          return "$base (Lat: ${e.sleepLatencyMinutes}m, Awake: ${e.awakeDurationMinutes}m/${e.awakeningsCount}x)";
-        }).join(" | ");
+        int averageLatency = totalLatency ~/ (sleepSessionsTotal==0 ? 1 : sleepSessionsTotal);
 
-        // String substanceStr = log.substanceLog.map((e) =>
-        //   "${e.substanceTypeId}: ${e.amount} @ ${DateFormat('HH:mm').format(e.time)}").join(" | ");
+        int caffeineTotal = log.substanceLog.where((e) => e.substanceTypeId == 'coffee').fold(0, (sum, e) => sum + (int.tryParse(e.amount) ?? 0));
 
-        // String medsStr = log.medicationLog.map((e) =>
-        //   "${e.medicationTypeId} (${e.dosage}mg) @ ${DateFormat('HH:mm').format(e.time)}").join(" | ");
+        int medsLogTotal = log.medicationLog.length;
 
-        // String exerciseStr = log.exerciseLog.map((e) =>
-        //   "${e.type} (${DateFormat('HH:mm').format(e.startTime)}-${DateFormat('HH:mm').format(e.finishTime)})").join(" | ");
+        int exerciseTotalMins = log.exerciseLog.fold(0, (sum, e) => sum + e.finishTime.difference(e.startTime).inMinutes);
 
         mainRows.add([
           DateFormat('yyyy-MM-dd').format(date),
           category?.displayName ?? "",
           log.totalSleepHours.toStringAsFixed(2),
-          totalLatency,
+          averageLatency,
           totalAwakenings,
           totalAwakeDur,
           lastOutTime,
-          sleepStr,
+          sleepSessionsTotal,
           log.notes ?? "",
-          // substanceStr,
-          // medsStr,
-          // exerciseStr
+          caffeineTotal,
+          medsLogTotal,
+          exerciseTotalMins
         ]);
       }
 
@@ -264,7 +263,7 @@ This export contains your sleep tracking data in a structured folder format.
 
 ## Files
 
-- `main_daily_log.csv`: Summary statistics for each day, including total sleep, latency, awakenings, and summary logs.
+- `main_daily_log.csv`: Summary statistics for each day, including total sleep, average latency, awakenings, and summary logs.
 - `category_logs/`: Detailed logs for each category.
   - `sleep_log.csv`: Individual sleep sessions with times and metrics.
   - `substance_log.csv`: Caffeine and alcohol consumption entries.
@@ -277,55 +276,94 @@ This export contains your sleep tracking data in a structured folder format.
   - `exercise_types.csv`: Exercise type categories.
   - `substance_types.csv`: Substance type categories.
 
+## Column Descriptions
+
+### main_daily_log.csv
+- **Date**: The date of the log entry in YYYY-MM-DD format.
+- **Day Type**: The type of day (e.g., Work, Relax, Travel, Social), based on user-selected category.
+- **Total Sleep (Hours)**: Total hours of sleep for the day, calculated as the sum of all sleep session durations.
+- **Sleep Latency (Mins)**: Average time in minutes taken to fall asleep across all sleep sessions (truncated to integer).
+- **Awakenings (Count)**: Total number of awakenings during sleep across all sessions (self-reported).
+- **Awake Duration (Mins)**: Overall duration of awakenings during sleep periods across all sessions (self-reported).
+- **Out Of Bed Time**: The time the user got out of bed for the last sleep session, in HH:mm format (empty if not recorded).
+- **Sleep Sessions Total**: The number of sleep sessions logged for the day.
+- **Notes**: Any additional notes entered by the user for the day.
+- **Caffeine Total (Cups)**: Total number of cups of coffee (or other caffeine/alcohol) consumed.
+- **Meds Log Total (Entries)**: Total number of medication entries for the day.
+- **Exercise Total (Mins)**: Total minutes spent exercising for the day.
+
+### sleep_log.csv
+- **Date**: The date of the sleep session in YYYY-MM-DD format.
+- **Bed Time**: The time the user went to bed, in HH:mm format.
+- **Fell Asleep Time**: The time the user fell asleep, in HH:mm format.
+- **Wake Time**: The time the user woke up, in HH:mm format.
+- **Out Of Bed Time**: The time the user got out of bed (i.e. Rise Time), in HH:mm format (empty if not recorded).
+- **Duration Hours**: The duration of the sleep session in hours (calculated from fell asleep to wake time).
+- **Sleep Latency Mins**: Time in minutes taken to fall asleep (bed time to fell asleep time).
+- **Awakenings Count**: Number of times the user woke up during this session (self-reported).
+- **Awake Duration Mins**: Overall duration of awakenings during this sleep session (self-reported).
+- **Sleep Location**: The location where the user slept (e.g., Bed, Couch, In Transit).
+
+### substance_log.csv
+- **Date**: The date of the substance entry in YYYY-MM-DD format.
+- **Substance Type**: The type of substance (e.g., coffee, tea, cola, alcohol).
+- **Amount**: The amount consumed (number of cups).
+- **Time**: The time the substance was consumed, in HH:mm format.
+
+### medication_log.csv
+- **Date**: The date of the medication entry in YYYY-MM-DD format.
+- **Medication Type**: The type of medication taken (e.g., Melatonin).
+- **Dosage**: The dosage amount (mg).
+- **Time**: The time the medication was taken, in HH:mm format.
+
+### exercise_log.csv
+- **Date**: The date of the exercise session in YYYY-MM-DD format.
+- **Exercise Type**: The type of exercise (e.g., Light, Medium, Heavy).
+- **Start Time**: The start time of the exercise session, in HH:mm format.
+- **Finish Time**: The finish time of the exercise session, in HH:mm format.
+- **Duration Mins**: The duration of the exercise session in minutes.
+
 ## Notes
 
 - All times are in 24-hour format (HH:mm).
-- Dates are in YYYY-MM-DD format.
+- Dates are in YYYY-MM-DD format. Please use dates to link files for database analysis.
 - Durations are in hours or minutes as specified.
 - Empty fields indicate no data or N/A.
+- exercise_types and substance_types are not editable in this version of the app.
 ''';
       final readmeFile = File("${exportDir.path}/README.md");
       await readmeFile.writeAsString(readmeContent);
 
-      // Collect all files
-      final files = <XFile>[];
+      // Create zip archive
+      final archive = Archive();
+
+      // Add all files to the archive
       await for (var entity in exportDir.list(recursive: true)) {
         if (entity is File) {
-          files.add(XFile(entity.path));
+          final fileName = entity.path.replaceFirst('${exportDir.path}/', '');
+          final fileBytes = await entity.readAsBytes();
+          final archiveFile = ArchiveFile(fileName, fileBytes.length, fileBytes);
+          archive.addFile(archiveFile);
         }
       }
 
-      await Share.shareXFiles(files, text: 'Here is your sleep data export with folder structure.');
+      // Encode the archive as a zip
+      final zipEncoder = ZipEncoder();
+      final zipData = zipEncoder.encode(archive);
 
-      // // Create zip archive
-      // final archive = Archive();
+      // Save the zip file
+      final zipFileName = 'sleep_data_export_${DateFormat('yyyy-MM-dd_HH-mm-ss').format(DateTime.now())}.zip';
+      final zipFile = File("${directory.path}/$zipFileName");
+      await zipFile.writeAsBytes(zipData);
+      print('Zip file created: ${zipFile.path}');
 
-      // // Add all files to the archive
-      // await for (var entity in exportDir.list(recursive: true)) {
-      //   if (entity is File) {
-      //     final fileName = entity.path.replaceFirst('${exportDir.path}/', '');
-      //     final fileBytes = await entity.readAsBytes();
-      //     final archiveFile = ArchiveFile(fileName, fileBytes.length, fileBytes);
-      //     archive.addFile(archiveFile);
-      //   }
-      // }
-
-      // // Encode the archive as a zip
-      // final zipEncoder = ZipEncoder();
-      // final zipData = zipEncoder.encode(archive);
-
-      // // Save the zip file
-      // final zipFileName = 'sleep_data_export_${DateFormat('yyyy-MM-dd_HH-mm-ss').format(DateTime.now())}.zip';
-      // final zipFile = File("${directory.path}/$zipFileName");
-      // await zipFile.writeAsBytes(zipData);
-
-      // // Share the zip file
-      // final params = ShareParams(
-      //   text: 'Here is your sleep data export as a zip file.',
-      //   files: [XFile(zipFile.path)],
-      // );
-      // // TODO: Fix share issue (no zip file appears)
-      // await SharePlus.instance.share(params);
+      // Share the zip file
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(zipFile.path)], 
+          text: 'Here is your sleep data export as a zip file.'
+          )
+        );
 
     } catch (e) {
       if (context.mounted) {
