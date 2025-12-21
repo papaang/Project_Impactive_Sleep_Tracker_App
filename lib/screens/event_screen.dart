@@ -172,10 +172,32 @@ class _EventScreenState extends State<EventScreen> {
                         context: context,
                         builder: (context) => SimpleDialog(
                           title: Text('Select Sleep Location'),
-                          children: categories.map((cat) => SimpleDialogOption(
-                            onPressed: () => Navigator.pop(context, cat),
-                            child: Text(cat.name),
-                          )).toList(),
+                          children: [
+                            ...categories.map((cat) => SimpleDialogOption(
+                              onPressed: () => Navigator.pop(context, cat),
+                              child: Text(cat.name),
+                            )),
+                            SimpleDialogOption(
+                              onPressed: () async {
+                                Navigator.pop(context); // Close the dialog
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => const CategoryManagementScreen()),
+                                );
+                                // Reload sleep locations after returning from category management
+                                setDialogState(() {
+                                  // Note: Since categories are reloaded, but the dialog is closed, the next time it's opened it will have updated categories
+                                });
+                              },
+                              child: Row(
+                                children: [
+                                  Icon(Icons.settings, color: Colors.grey),
+                                  const SizedBox(width: 16),
+                                  Text('Manage Categories'),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       );
                       if (selected != null) setDialogState(() => sleepLocationId = selected.id);
@@ -252,10 +274,30 @@ class _EventScreenState extends State<EventScreen> {
       context: context,
       builder: (context) => SimpleDialog(
         title: Text('Select Sleep Location'),
-        children: categories.map((cat) => SimpleDialogOption(
-          onPressed: () => Navigator.pop(context, cat),
-          child: Text(cat.name),
-        )).toList(),
+        children: [
+          ...categories.map((cat) => SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, cat),
+            child: Text(cat.name),
+          )),
+          SimpleDialogOption(
+            onPressed: () async {
+              Navigator.pop(context); // Close the dialog
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CategoryManagementScreen()),
+              );
+              // Reload sleep locations after returning from category management
+              // Note: Since categories are reloaded, but the dialog is closed, the next time it's opened it will have updated categories
+            },
+            child: Row(
+              children: [
+                Icon(Icons.settings, color: Colors.grey),
+                const SizedBox(width: 16),
+                Text('Manage Categories'),
+              ],
+            ),
+          ),
+        ],
       ),
     );
     if (selected != null) sleepLocationId = selected.id;

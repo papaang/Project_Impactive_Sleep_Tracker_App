@@ -46,6 +46,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
     final nameController = TextEditingController(text: isEdit ? category.name : '');
     String selectedIcon = isEdit ? category.iconName : 'work_outline';
     String selectedColor = isEdit ? category.colorHex : '0xFF1565C0';
+    final dosageController = TextEditingController(text: isEdit && category.defaultDosage != null ? category.defaultDosage.toString() : '');
 
     final result = await showDialog<Map<String, String>>(
       context: context,
@@ -122,6 +123,14 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
                 onChanged: (value) => selectedColor = value!,
                 decoration: InputDecoration(labelText: 'Color'),
               ),
+              if (categoryType == 'medication_types') ...[
+                const SizedBox(height: 16),
+                TextField(
+                  controller: dosageController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(labelText: 'Default Dosage (mg)'),
+                ),
+              ],
             ],
           ),
         ),
@@ -133,11 +142,15 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
           TextButton(
             onPressed: () {
               if (nameController.text.isEmpty) return;
-              Navigator.pop(context, {
+              final resultMap = {
                 'name': nameController.text,
                 'iconName': selectedIcon,
                 'colorHex': selectedColor,
-              });
+              };
+              if (categoryType == 'medication_types' && dosageController.text.isNotEmpty) {
+                resultMap['defaultDosage'] = dosageController.text;
+              }
+              Navigator.pop(context, resultMap);
             },
             child: Text(isEdit ? 'Save' : 'Add'),
           ),
@@ -152,6 +165,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
           name: result['name']!,
           iconName: result['iconName']!,
           colorHex: result['colorHex']!,
+          defaultDosage: result['defaultDosage'] != null ? int.tryParse(result['defaultDosage']!) : category.defaultDosage,
         );
         final index = _categories[categoryType]!.indexWhere((c) => c.id == category.id);
         if (index != -1) {
@@ -167,6 +181,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
           name: result['name']!,
           iconName: result['iconName']!,
           colorHex: result['colorHex']!,
+          defaultDosage: result['defaultDosage'] != null ? int.tryParse(result['defaultDosage']!) : null,
         );
         _categories[categoryType]!.add(newCategory);
         await CategoryManager().saveCategories(categoryType, _categories[categoryType]!);

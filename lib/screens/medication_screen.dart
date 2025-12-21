@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models.dart';
 import '../log_service.dart';
+import 'category_management_screen.dart';
 
 class MedicationScreen extends StatefulWidget {
   final DateTime date;
@@ -55,72 +56,62 @@ class _MedicationScreenState extends State<MedicationScreen> {
               children: [
                 Icon(cat.icon, color: cat.color),
                 const SizedBox(width: 16),
-                Text(cat.name),
+                Text('${cat.name} (${cat.defaultDosage} mg)'),
               ],
             ),
           )),
           SimpleDialogOption(
-            onPressed: () => Navigator.pop(context, Category(id: 'custom', name: 'Other...', iconName: 'medication', colorHex: '0xFF424242')),
-            child: Text('Other...'),
+            onPressed: () async {
+              Navigator.pop(context); // Close the dialog
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CategoryManagementScreen()),
+              );
+              // Reload medication types after returning from category management
+              final medicationTypes = await CategoryManager().getCategories('medication_types');
+              setState(() {
+                _medicationTypes = medicationTypes;
+              });
+            },
+            child: Row(
+              children: [
+                Icon(Icons.settings, color: Colors.grey),
+                const SizedBox(width: 16),
+                Text('Manage Categories'),
+              ],
+            ),
           ),
         ],
       ),
     );
 
-    String? typeId;
-    if (selectedType != null) {
-      if (selectedType.id == 'custom') {
-        final controller = TextEditingController();
-        final customName = await showDialog<String>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text('Enter Medication Name'),
-            content: TextField(
-              controller: controller,
-              autofocus: true,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: InputDecoration(hintText: 'e.g. Ibuprofen'),
-            ),
-            actions: [
-              TextButton(
-                child: Text('Cancel'),
-                onPressed: () => Navigator.pop(context),
-              ),
-              TextButton(
-                child: Text('Save'),
-                onPressed: () => Navigator.pop(context, controller.text),
-              ),
-            ],
-          ),
-        );
-        if (customName == null || customName.isEmpty) return;
-        typeId = customName;
-      } else {
-        typeId = selectedType.id;
-      }
-    } else {
-      return;
-    }
+    if (selectedType == null) return;
+    final String typeId = selectedType.id;
 
-    String? dosage = await showDialog<String>(
-        context: context,
-        builder: (context) {
-            final controller = TextEditingController();
-            return AlertDialog(
-                title: const Text('Enter Dosage (mg)'),
-                content: TextField(
-                    controller: controller,
-                    keyboardType: TextInputType.number,
-                    autofocus: true,
-                    decoration: const InputDecoration(hintText: 'e.g. 5 or 10'),
-                ),
-                actions: [
-                    TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-                    TextButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('OK')),
-                ],
-            );
-        }
-    );
+    String? dosage;
+    if (selectedType.defaultDosage != null) {
+      dosage = selectedType.defaultDosage.toString();
+    } else {
+      dosage = await showDialog<String>(
+          context: context,
+          builder: (context) {
+              final controller = TextEditingController();
+              return AlertDialog(
+                  title: const Text('Enter Dosage (mg)'),
+                  content: TextField(
+                      controller: controller,
+                      keyboardType: TextInputType.number,
+                      autofocus: true,
+                      decoration: const InputDecoration(hintText: 'e.g. 5 or 10'),
+                  ),
+                  actions: [
+                      TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                      TextButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('OK')),
+                  ],
+              );
+          }
+      );
+    }
 
     if (dosage == null || dosage.isEmpty) return;
 

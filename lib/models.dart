@@ -14,12 +14,14 @@ class Category {
   final String name; // category display name
   final String iconName; // icon name from https://fonts.google.com/icons
   final String colorHex; // color in hexadecimal format '0xAARRGGBB'
+  final int? defaultDosage; // default dosage in mg, only for medication types
 
   Category({
     required this.id,
     required this.name,
     required this.iconName,
     required this.colorHex,
+    this.defaultDosage,
   });
 
   Map<String, dynamic> toJson() => {
@@ -27,6 +29,7 @@ class Category {
     'name': name,
     'iconName': iconName,
     'colorHex': colorHex,
+    'defaultDosage': defaultDosage,
   };
 
   factory Category.fromJson(Map<String, dynamic> json) => Category(
@@ -34,6 +37,7 @@ class Category {
     name: json['name'],
     iconName: json['iconName'],
     colorHex: json['colorHex'],
+    defaultDosage: json['defaultDosage'],
   );
 
   // get Icon from iconName
@@ -147,10 +151,10 @@ class CategoryManager {
   // Medication Types
   if (_prefs.getString('medication_types') == null) {
     final defaultMedicationTypes = [
-      Category(id: 'melatonin', name: 'Melatonin', iconName: 'medication', colorHex: '0xFF2E7D32'),
-      Category(id: 'daridorexant', name: 'Daridorexant', iconName: 'medication', colorHex: '0xFF1565C0'),
-      Category(id: 'sertraline', name: 'Sertraline', iconName: 'medication', colorHex: '0xFF7B1FA2'),
-      Category(id: 'lisdexamfetamine', name: 'Lisdexamfetamine', iconName: 'medication', colorHex: '0xFFEF6C00'),
+      Category(id: 'melatonin', name: 'Melatonin', iconName: 'medication', colorHex: '0xFF2E7D32', defaultDosage: 3),
+      Category(id: 'daridorexant', name: 'Daridorexant', iconName: 'medication', colorHex: '0xFF1565C0', defaultDosage: 50),
+      Category(id: 'sertraline', name: 'Sertraline', iconName: 'medication', colorHex: '0xFF7B1FA2', defaultDosage: 50),
+      Category(id: 'lisdexamfetamine', name: 'Lisdexamfetamine', iconName: 'medication', colorHex: '0xFFEF6C00', defaultDosage: 30),
     ];
     await saveCategories('medication_types', defaultMedicationTypes);
   }
