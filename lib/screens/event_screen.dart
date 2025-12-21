@@ -442,7 +442,7 @@ class _EventScreenState extends State<EventScreen> {
                 ),
                 const SizedBox(height: 16),
                 _EventButton(
-                  label: 'Caffeine & Alcohol',
+                  label: 'Caffeine',
                   subtitle: _log.substanceLog.isNotEmpty ? "${_log.substanceLog.length} entries" : null,
                   icon: Icons.coffee_outlined,
                   color: Colors.brown[600]!,

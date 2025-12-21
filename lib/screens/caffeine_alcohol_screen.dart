@@ -44,59 +44,88 @@ class _CaffeineAlcoholScreenState extends State<CaffeineAlcoholScreen> {
   }
 
   Future<void> _addEntry() async {
-    final Category? selectedType = await showDialog<Category>(
+    int cups = 1; // Default to 1 cup
+    DateTime selectedTime = DateTime.now(); // Default to current time
+
+    final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) => SimpleDialog(
-        title: Text('Select Substance'),
-        children: _substanceTypes.map((cat) => SimpleDialogOption(
-          onPressed: () => Navigator.pop(context, cat),
-          child: Row(
-            children: [
-              Icon(cat.icon, color: cat.color),
-              const SizedBox(width: 16),
-              Text(cat.name),
+      builder: (context) {
+        int tempCups = cups;
+        DateTime tempTime = selectedTime;
+        return StatefulBuilder(
+          builder: (context, setState) => AlertDialog(
+            title: const Text('Add Caffeine'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    const Text('Cups: '),
+                    DropdownButton<int>(
+                      value: tempCups,
+                      items: List.generate(10, (i) => i + 1).map((int value) {
+                        return DropdownMenuItem<int>(
+                          value: value,
+                          child: Text('$value'),
+                        );
+                      }).toList(),
+                      onChanged: (int? newValue) {
+                        if (newValue != null) {
+                          setState(() => tempCups = newValue);
+                        }
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                ListTile(
+                  title: Text('Time: ${DateFormat('h:mm a').format(tempTime)}'),
+                  trailing: const Icon(Icons.edit),
+                  onTap: () async {
+                    final TimeOfDay? picked = await showTimePicker(
+                      context: context,
+                      initialTime: TimeOfDay.fromDateTime(tempTime),
+                    );
+                    if (picked != null) {
+                      setState(() {
+                        tempTime = DateTime(
+                          widget.date.year,
+                          widget.date.month,
+                          widget.date.day,
+                          picked.hour,
+                          picked.minute,
+                        );
+                      });
+                    }
+                  },
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, null), // Cancel
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, {'cups': tempCups, 'time': tempTime}), // Confirm
+                child: const Text('Confirm'),
+              ),
             ],
           ),
-        )).toList(),
-      ),
-    );
-    if (selectedType == null) return;
-
-    List<String> amountOptions;
-    if (selectedType.id == 'alcohol') {
-      amountOptions = ['1 drink', '2 drinks', '3 drinks', '4 drinks', '5+ drinks'];
-    } else {
-      amountOptions = ['One cup', 'Two cups', 'Three cups', 'Four cups'];
-    }
-
-    final String? amount = await showDialog<String>(
-      context: context,
-      builder: (context) => SimpleDialog(
-        title: Text('Select Amount (${selectedType.name})'),
-        children: amountOptions.map((opt) => SimpleDialogOption(
-          onPressed: () => Navigator.pop(context, opt),
-          child: Text(opt),
-        )).toList(),
-      ),
-    );
-    if (amount == null) return;
-
-    final TimeOfDay? time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.now(),
-      helpText: 'Select Time of Consumption',
-    );
-    if (time == null) return;
-
-    final DateTime entryTime = DateTime(
-      widget.date.year,
-      widget.date.month,
-      widget.date.day,
-      time.hour,
-      time.minute,
+        );
+      },
     );
 
-    final newEntry = SubstanceEntry(substanceTypeId: selectedType.id, amount: amount, time: entryTime);
+    if (result == null) return; // Cancelled
+
+    final int finalCups = result['cups'];
+    final DateTime finalTime = result['time'];
+
+    final newEntry = SubstanceEntry(
+      substanceTypeId: 'coffee',
+      amount: finalCups.toString(),
+      time: finalTime,
+    );
     setState(() {
       _log.substanceLog.add(newEntry);
     });
@@ -119,7 +148,7 @@ class _CaffeineAlcoholScreenState extends State<CaffeineAlcoholScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Caffeine & Alcohol', style: TextStyle(fontSize: 20)),
+            const Text('Caffeine', style: TextStyle(fontSize: 20)),
             Text(
               displayDate,
               style: const TextStyle(
@@ -141,7 +170,7 @@ class _CaffeineAlcoholScreenState extends State<CaffeineAlcoholScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8.0),
                     child: Text(
-                      'Consumption Log',
+                      'Caffeine Log',
                       style: Theme.of(context)
                           .textTheme
                           .headlineSmall
@@ -160,7 +189,8 @@ class _CaffeineAlcoholScreenState extends State<CaffeineAlcoholScreen> {
                         child: ListTile(
                           leading: Icon(category?.icon ?? Icons.local_drink,
                               color: category?.color ?? Colors.brown),
-                          title: Text("$displayName: ${item.amount}",
+                          // Display if amount>1, display 'x cups', elif amount<1 display 'cup', elif int parsing error display 'cup'
+                          title: Text("$displayName: ${item.amount} cup${(int.tryParse(item.amount)!= null ? int.tryParse(item.amount)! : 0) > 1 ? 's' : ''}",
                               style: TextStyle(fontWeight: FontWeight.bold)),
                           subtitle:
                               Text(DateFormat('h:mm a').format(item.time)),
@@ -175,7 +205,7 @@ class _CaffeineAlcoholScreenState extends State<CaffeineAlcoholScreen> {
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
                     icon: const Icon(Icons.add),
-                    label: const Text('Add Consumption Entry'),
+                    label: const Text('Add Caffeine Entry'),
                     onPressed: _addEntry,
                   ),
                 ],

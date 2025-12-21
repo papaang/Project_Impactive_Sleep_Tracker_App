@@ -152,7 +152,7 @@ class _MedicationScreenState extends State<MedicationScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Medication Log', style: TextStyle(fontSize: 20)),
+            const Text('Medication', style: TextStyle(fontSize: 20)),
             Text(
               displayDate,
               style: const TextStyle(

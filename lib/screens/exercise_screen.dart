@@ -141,7 +141,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Exercise Log', style: TextStyle(fontSize: 20)),
+            const Text('Exercise', style: TextStyle(fontSize: 20)),
             Text(
               displayDate,
               style: const TextStyle(
@@ -163,7 +163,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8.0),
                     child: Text(
-                      'Exercise Entries',
+                      'Exercise Log',
                       style: Theme.of(context)
                           .textTheme
                           .headlineSmall

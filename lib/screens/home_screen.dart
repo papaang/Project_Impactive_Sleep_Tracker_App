@@ -206,6 +206,35 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _addOneCaffeine() async {
+    int cups = 1; // Default to 1 cup
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    if (!isSameDay(_loadedDate, today)) {
+      _loadedDate = today;
+      _todayLog = await _logService.getDailyLog(today);
+    }
+
+    final newEntry = SubstanceEntry(
+      substanceTypeId: 'coffee',
+      amount: cups.toString(),
+      time: now,
+    );
+    _todayLog.substanceLog.add(newEntry);
+    await _logService.saveDailyLog(_loadedDate, _todayLog);
+
+    // Show brief notification
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$cups cup of caffeine logged at ${DateFormat('h:mm a').format(now)}'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   Future<void> _showDayTypeDialog() async {
     final Category? selectedType = await showDialog<Category>(
       context: context,
@@ -508,14 +537,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         ),
                         _SquareButton(
                           icon: Icons.coffee_outlined,
-                          label: "Caffeine &\nAlcohol",
+                          label: "+1 Caffeine",
                           color: Colors.brown,
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => CaffeineAlcoholScreen(date: _loadedDate)),
-                            ).then((_) => _loadTodayLog());
-                          },
+                          onPressed: _addOneCaffeine,
                         ),
                         _SquareButton(
                           icon: Icons.fitness_center_outlined,
