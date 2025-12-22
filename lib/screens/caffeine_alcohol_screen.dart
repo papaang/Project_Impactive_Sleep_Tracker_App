@@ -5,7 +5,10 @@ import '../log_service.dart';
 
 class CaffeineAlcoholScreen extends StatefulWidget {
   final DateTime date;
-  const CaffeineAlcoholScreen({super.key, required this.date});
+   final bool autoOpenAdd; // Added for notification shortcut
+
+  const CaffeineAlcoholScreen({super.key, required this.date, this.autoOpenAdd = false});
+  
 
   @override
   State<CaffeineAlcoholScreen> createState() => _CaffeineAlcoholScreenState();
@@ -32,6 +35,9 @@ class _CaffeineAlcoholScreenState extends State<CaffeineAlcoholScreen> {
         _log = log;
         _substanceTypes = substanceTypes;
       });
+      if (widget.autoOpenAdd && mounted) {
+        Future.delayed(const Duration(milliseconds: 300), _addEntry);
+      }
     } catch (e) {
        // handle error
     } finally {
