@@ -23,6 +23,11 @@ class LogService {
   Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
   }
+  bool get isDarkMode => _prefs.getBool('is_dark_mode') ?? false;
+
+  Future<void> setDarkMode(bool value) async {
+    await _prefs.setBool('is_dark_mode', value);
+  }
 
   String _getKeyForDate(DateTime date) {
     return 'log_${DateFormat('yyyy-MM-dd').format(date)}';
