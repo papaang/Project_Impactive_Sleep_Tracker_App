@@ -1,6 +1,7 @@
+import 'dart:math';
+import 'dart:ui' as ui; // Added import for ui.TextDirection and ui.PictureRecorder
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:table_calendar/table_calendar.dart';
 import '../log_service.dart';
 import '../models.dart';
 import 'medication_screen.dart';
@@ -8,6 +9,8 @@ import 'caffeine_alcohol_screen.dart';
 import 'exercise_screen.dart';
 import 'notes_screen.dart';
 import 'category_management_screen.dart';
+import 'package:table_calendar/table_calendar.dart';
+
 
 class EventScreen extends StatefulWidget {
   final DateTime date;
@@ -47,7 +50,7 @@ class _EventScreenState extends State<EventScreen> {
 
   String _formatTime(DateTime? dt) {
     if (dt == null) return 'Not set';
-    return DateFormat('h:mm a').format(dt);
+    return DateFormat('HH:mm').format(dt);
   }
 
   Future<DateTime?> _selectDateTime(DateTime? initialDate, {String? helpText}) async {
@@ -58,12 +61,13 @@ class _EventScreenState extends State<EventScreen> {
       initialDate: initialDate,
       firstDate: DateTime(2020),
       lastDate: DateTime(now.year + 5),
+      helpText: helpText,
     );
     if (date == null) return null;
     final TimeOfDay? time = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(initialDate),
-      helpText: helpText // Pass custom help text
+      helpText: helpText
     );
     if (time == null) return null;
     return DateTime(date.year, date.month, date.day, time.hour, time.minute);
@@ -77,18 +81,18 @@ class _EventScreenState extends State<EventScreen> {
           title: const Text('Select Day Type'),
           children: [
             ..._dayTypes.map((type) {
-              return SimpleDialogOption(
-                onPressed: () => Navigator.pop(context, type),
-                child: Row(
-                  children: [
-                    Icon(type.icon, color: type.color),
-                    const SizedBox(width: 16),
-                    Text(type.name),
-                  ],
-                ),
-              );
-            }),
-            SimpleDialogOption(
+            return SimpleDialogOption(
+              onPressed: () => Navigator.pop(context, type),
+              child: Row(
+                children: [
+                  Icon(type.icon, color: type.color),
+                  const SizedBox(width: 16),
+                  Text(type.name),
+                ],
+              ),
+            );
+          }),
+          SimpleDialogOption(
               onPressed: () async {
                 Navigator.pop(context); // Close the dialog
                 await Navigator.push(
@@ -105,14 +109,17 @@ class _EventScreenState extends State<EventScreen> {
                 children: [
                   Icon(Icons.settings, color: Colors.grey),
                   const SizedBox(width: 16),
-                  Text('Manage Categories'),
-                ],
+                  ],
               ),
-            ),
-          ],
+               ),
+        ],
+
+      
+          
         );
       },
     );
+    
 
     if (selectedType != null) {
       setState(() {
@@ -123,219 +130,53 @@ class _EventScreenState extends State<EventScreen> {
   }
 
   Future<void> _editSleepEntry(int index, SleepEntry entry) async {
-    DateTime? bedTime = entry.bedTime;
-    DateTime? fellAsleepTime = entry.fellAsleepTime;
-    DateTime? wakeTime = entry.wakeTime;
-    DateTime? outTime = entry.outOfBedTime;
-    int awakenings = entry.awakeningsCount;
-    int awakeMins = entry.awakeDurationMinutes;
-    String sleepLocationId = entry.sleepLocationId ?? 'bed';
-
     await showDialog(
       context: context,
+      barrierDismissible: false, // Prevent closing by tapping outside during editing
       builder: (context) {
-        final countCtrl = TextEditingController(text: awakenings.toString());
-        final durCtrl = TextEditingController(text: awakeMins.toString());
-
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: Text('Edit Sleep Session'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ListTile(title: Text('Bed: ${_formatTime(bedTime)}'), onTap: () async {
-                       var t = await _selectDateTime(bedTime, helpText: "Select Bed Time"); if(t!=null) setDialogState(()=> bedTime = t);
-                    }),
-                    ListTile(title: Text('Asleep: ${_formatTime(fellAsleepTime)}'), onTap: () async {
-                       var t = await _selectDateTime(fellAsleepTime, helpText: "Select Asleep Time"); if(t!=null) setDialogState(()=> fellAsleepTime = t);
-                    }),
-                    ListTile(title: Text('Wake: ${_formatTime(wakeTime)}'), onTap: () async {
-                       var t = await _selectDateTime(wakeTime, helpText: "Select Wake Time"); if(t!=null) setDialogState(()=> wakeTime = t);
-                    }),
-                    ListTile(title: Text('Out: ${_formatTime(outTime)}'), onTap: () async {
-                       var t = await _selectDateTime(outTime, helpText: "Select Out of Bed Time"); if(t!=null) setDialogState(()=> outTime = t);
-                    }),
-                    TextField(
-                      controller: countCtrl,
-                      decoration: InputDecoration(labelText: 'Number of Awakenings'),
-                      keyboardType: TextInputType.number,
-                    ),
-                    TextField(
-                      controller: durCtrl,
-                      decoration: InputDecoration(labelText: 'Total Awake Time (mins)'),
-                      keyboardType: TextInputType.number,
-                    ),
-                    ListTile(title: Text('Location: $sleepLocationId'), onTap: () async {
-                      final categories = await CategoryManager().getCategories('sleep_locations');
-                      final Category? selected = await showDialog<Category>(
-                        context: context,
-                        builder: (context) => SimpleDialog(
-                          title: Text('Select Sleep Location'),
-                          children: [
-                            ...categories.map((cat) => SimpleDialogOption(
-                              onPressed: () => Navigator.pop(context, cat),
-                              child: Text(cat.name),
-                            )),
-                            SimpleDialogOption(
-                              onPressed: () async {
-                                Navigator.pop(context); // Close the dialog
-                                await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => const CategoryManagementScreen()),
-                                );
-                                // Reload sleep locations after returning from category management
-                                setDialogState(() {
-                                  // Note: Since categories are reloaded, but the dialog is closed, the next time it's opened it will have updated categories
-                                });
-                              },
-                              child: Row(
-                                children: [
-                                  Icon(Icons.settings, color: Colors.grey),
-                                  const SizedBox(width: 16),
-                                  Text('Manage Categories'),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                      if (selected != null) setDialogState(() => sleepLocationId = selected.id);
-                    }),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(onPressed: ()=>Navigator.pop(context), child: Text('Cancel')),
-                TextButton(onPressed: () {
-                    awakenings = int.tryParse(countCtrl.text) ?? 0;
-                    awakeMins = int.tryParse(durCtrl.text) ?? 0;
-
-                    // Checking for incorrect order of sleep entry times
-                    if (fellAsleepTime!.isBefore(bedTime!)) {
-                      if(mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Asleep time cannot be before bed time.')));
-                      }
-                      return;
-                    }
-                    if (wakeTime!.isBefore(fellAsleepTime!)) {
-                      if(mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Wake time cannot be before sleep time.')));
-                      }
-                      return;
-                    }
-                    if (outTime!.isBefore(wakeTime!)) {
-                      if(mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Out of bed time cannot be before wake time.')));
-                      }
-                      return;
-                    }
-
-                   setState(() {
-                     _log.sleepLog[index] = SleepEntry(
-                       bedTime: bedTime!,
-                       wakeTime: wakeTime!,
-                       fellAsleepTime: fellAsleepTime!,
-                       outOfBedTime: outTime!,
-                       awakeningsCount: awakenings,
-                       awakeDurationMinutes: awakeMins,
-                       sleepLocationId: sleepLocationId,
-                     );
-                   });
-                   _logService.saveDailyLog(widget.date, _log);
-                   Navigator.pop(context);
-                }, child: Text('Save')),
-              ],
-            );
-          }
+        return SleepSessionEditor(
+          initialEntry: entry,
+          onSave: (updatedEntry) {
+            setState(() {
+              _log.sleepLog[index] = updatedEntry;
+            });
+            _logService.saveDailyLog(widget.date, _log);
+          },
         );
-      }
+      },
     );
   }
 
   Future<void> _addSleepEntry() async {
-    DateTime now = DateTime.now();
-    String sleepLocationId = 'bed';
+    final now = DateTime.now();
+    final defaultBed = DateTime(widget.date.year, widget.date.month, widget.date.day, 23, 0).subtract(Duration(days: 1));
+    final defaultAsleep = defaultBed.add(Duration(minutes: 30));
+    final defaultWake = defaultBed.add(Duration(hours: 8, minutes: 30));
+    final defaultOut = defaultWake.add(Duration(minutes: 30));
 
-    // For today's date, default to current time; for past days, default to 10 PM on the selected date
-    DateTime initialBedTime = isSameDay(widget.date, now) ? now : DateTime(widget.date.year, widget.date.month, widget.date.day, 22, 0);
-
-    DateTime? bedTime = await _selectDateTime(initialBedTime, helpText: "Select Bed Time");
-    if (bedTime == null) return;
-
-    DateTime? fellAsleepTime = await _selectDateTime(bedTime, helpText: "Select Asleep Time");
-    if (fellAsleepTime == null) return;
-
-    DateTime? wakeTime = await _selectDateTime(fellAsleepTime.add(Duration(hours: 8)), helpText: "Select Wake Time");
-    if (wakeTime == null) return;
-
-    DateTime? outTime = await _selectDateTime(wakeTime, helpText: "Select Out of Bed Time");
-    if (outTime == null) return;
-
-    final categories = await CategoryManager().getCategories('sleep_locations');
-    final Category? selected = await showDialog<Category>(
-      context: context,
-      builder: (context) => SimpleDialog(
-        title: Text('Select Sleep Location'),
-        children: [
-          ...categories.map((cat) => SimpleDialogOption(
-            onPressed: () => Navigator.pop(context, cat),
-            child: Text(cat.name),
-          )),
-          SimpleDialogOption(
-            onPressed: () async {
-              Navigator.pop(context); // Close the dialog
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const CategoryManagementScreen()),
-              );
-              // Reload sleep locations after returning from category management
-              // Note: Since categories are reloaded, but the dialog is closed, the next time it's opened it will have updated categories
-            },
-            child: Row(
-              children: [
-                Icon(Icons.settings, color: Colors.grey),
-                const SizedBox(width: 16),
-                Text('Manage Categories'),
-              ],
-            ),
-          ),
-        ],
-      ),
+    final newEntry = SleepEntry(
+      bedTime: defaultBed, 
+      fellAsleepTime: defaultAsleep, 
+      wakeTime: defaultWake, 
+      outOfBedTime: defaultOut
     );
-    if (selected != null) sleepLocationId = selected.id;
 
-    // Checking for incorrect order of sleep entry times
-    if (fellAsleepTime.isBefore(bedTime)) {
-       if(mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Asleep time cannot be before bed time.')));
-       }
-       return;
-    }
-    if (wakeTime.isBefore(fellAsleepTime)) {
-       if(mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Wake time cannot be before sleep time.')));
-       }
-       return;
-    }
-    if (outTime.isBefore(wakeTime)) {
-       if(mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Out of bed time cannot be before wake time.')));
-       }
-       return;
-    }
-
-    setState(() {
-      _log.sleepLog.add(SleepEntry(
-        bedTime: bedTime,
-        wakeTime: wakeTime,
-        fellAsleepTime: fellAsleepTime,
-        outOfBedTime: outTime,
-        sleepLocationId: sleepLocationId,
-      ));
-    });
-    await _logService.saveDailyLog(widget.date, _log);
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return SleepSessionEditor(
+          initialEntry: newEntry,
+          isNew: true,
+          onSave: (updatedEntry) {
+            setState(() {
+              _log.sleepLog.add(updatedEntry);
+            });
+            _logService.saveDailyLog(widget.date, _log);
+          },
+        );
+      },
+    );
   }
 
   void _deleteSleepEntry(int index) {
@@ -426,7 +267,6 @@ class _EventScreenState extends State<EventScreen> {
                   label: _dayTypes.where((c) => c.id == _log.dayTypeId).firstOrNull?.displayName ?? 'Type of Day',
                   icon: _dayTypes.where((c) => c.id == _log.dayTypeId).firstOrNull?.icon ?? Icons.wb_sunny_outlined,
                   color: _dayTypes.where((c) => c.id == _log.dayTypeId).firstOrNull?.color ?? Colors.indigo[800]!,
-                  backgroundColor: _dayTypes.where((c) => c.id == _log.dayTypeId).firstOrNull?.color.withAlpha(26),
                   onPressed: _showDayTypeDialog,
                 ),
                 const SizedBox(height: 16),
@@ -446,7 +286,7 @@ class _EventScreenState extends State<EventScreen> {
                 ),
                 const SizedBox(height: 16),
                 _EventButton(
-                  label: 'Caffeine',
+                  label: 'Caffeine & Alcohol',
                   subtitle: _log.substanceLog.isNotEmpty ? "${_log.substanceLog.length} entries" : null,
                   icon: Icons.coffee_outlined,
                   color: Colors.brown[600]!,
@@ -495,38 +335,6 @@ class _EventScreenState extends State<EventScreen> {
   }
 }
 
-// class _SleepTimeChip currently unused
-// class _SleepTimeChip extends StatelessWidget {
-//   const _SleepTimeChip({required this.label, required this.time});
-//   final String label;
-//   final String time;
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Row(
-//       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//       children: [
-//         Text(
-//           label,
-//           style: TextStyle(
-//             fontSize: 14,
-//             color: Colors.grey[600],
-//             fontWeight: FontWeight.w600,
-//           ),
-//         ),
-//         Text(
-//           time,
-//           style: TextStyle(
-//             fontSize: 14,
-//             color: Colors.black87,
-//             fontWeight: FontWeight.w600,
-//           ),
-//         ),
-//       ],
-//     );
-//   }
-// }
-
 class _EventButton extends StatelessWidget {
   const _EventButton({
     required this.label,
@@ -534,31 +342,22 @@ class _EventButton extends StatelessWidget {
     required this.color,
     required this.onPressed,
     this.subtitle,
-    this.backgroundColor,
   });
   final String label;
   final String? subtitle;
   final IconData icon;
   final Color color;
-  final Color? backgroundColor;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    if (backgroundColor != null) {
-      return InkWell(
+    return Card(
+      elevation: 1.0,
+      child: InkWell(
         onTap: onPressed,
         borderRadius: BorderRadius.circular(12.0),
-        child: Container(
+        child: Padding(
           padding: const EdgeInsets.all(16.0),
-          decoration: BoxDecoration(
-            color: backgroundColor,
-            border: Border.all(
-              color: color,
-              width: 1.5,
-            ),
-            borderRadius: BorderRadius.circular(12.0),
-          ),
           child: Row(
             children: [
               Icon(icon, color: color, size: 28),
@@ -589,47 +388,640 @@ class _EventButton extends StatelessWidget {
             ],
           ),
         ),
-      );
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// --- NEW INTERACTIVE VISUAL SLEEP EDITOR ---
+// ---------------------------------------------------------------------------
+
+class SleepSessionEditor extends StatefulWidget {
+  final SleepEntry initialEntry;
+  final Function(SleepEntry) onSave;
+  final bool isNew;
+
+  const SleepSessionEditor({
+    super.key, 
+    required this.initialEntry, 
+    required this.onSave,
+    this.isNew = false,
+  });
+
+  @override
+  State<SleepSessionEditor> createState() => _SleepSessionEditorState();
+}
+
+enum _SleepHandle { none, bed, asleep, wake, out }
+
+class _SleepSessionEditorState extends State<SleepSessionEditor> {
+  // Step 1: Times, Step 2: Details
+  int _currentStep = 1;
+
+  late DateTime _bedTime;
+  late DateTime _asleepTime;
+  late DateTime _wakeTime;
+  late DateTime _outTime;
+  late int _awakenings;
+  late int _awakeMins;
+  late String _locationId;
+  List<Category> _sleepLocations = [];
+
+  _SleepHandle _draggingHandle = _SleepHandle.none;
+
+  final TextEditingController _awakeningsCtrl = TextEditingController();
+  final TextEditingController _awakeMinsCtrl = TextEditingController();
+
+  static const double _clockSize = 300.0;
+  static const double _outerPadding = 35.0; // Radius for Bed/Out
+  static const double _innerPadding = 65.0; // Radius for Asleep/Wake
+
+  @override
+  void initState() {
+    super.initState();
+    _bedTime = widget.initialEntry.bedTime;
+    _asleepTime = widget.initialEntry.fellAsleepTime;
+    _wakeTime = widget.initialEntry.wakeTime;
+    _outTime = widget.initialEntry.outOfBedTime ?? widget.initialEntry.wakeTime;
+    _awakenings = widget.initialEntry.awakeningsCount;
+    _awakeMins = widget.initialEntry.awakeDurationMinutes;
+    _locationId = widget.initialEntry.sleepLocationId ?? 'bed';
+
+    _awakeningsCtrl.text = _awakenings.toString();
+    _awakeMinsCtrl.text = _awakeMins.toString();
+    
+    _loadLocations();
+  }
+
+  Future<void> _loadLocations() async {
+    final locs = await CategoryManager().getCategories('sleep_locations');
+    if (mounted) {
+      setState(() {
+        _sleepLocations = locs;
+        if (_sleepLocations.isNotEmpty && !_sleepLocations.any((c) => c.id == _locationId)) {
+           _locationId = _sleepLocations.first.id;
+        }
+      });
+    }
+  }
+
+  Future<void> _pickTime(String type) async {
+    DateTime initial;
+    switch(type) {
+      case 'bed': initial = _bedTime; break;
+      case 'asleep': initial = _asleepTime; break;
+      case 'wake': initial = _wakeTime; break;
+      case 'out': initial = _outTime; break;
+      default: initial = DateTime.now();
+    }
+
+    final DateTime? d = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      helpText: "Select $type date",
+    );
+    
+    if (d == null) return; 
+
+    final TimeOfDay? t = await showTimePicker(
+      context: context, 
+      initialTime: TimeOfDay.fromDateTime(initial),
+      helpText: "Select $type time"
+    );
+
+    if (t != null) {
+      setState(() {
+        final newDt = DateTime(d.year, d.month, d.day, t.hour, t.minute);
+        switch(type) {
+          case 'bed': _bedTime = newDt; break;
+          case 'asleep': _asleepTime = newDt; break;
+          case 'wake': _wakeTime = newDt; break;
+          case 'out': _outTime = newDt; break;
+        }
+      });
+    }
+  }
+
+  // --- INTERACTION LOGIC (IMPROVED) ---
+
+  void _updateTimeFromTouch(Offset localPosition) {
+    final Offset center = Offset(_clockSize / 2, _clockSize / 2);
+    final Offset delta = localPosition - center;
+    
+    double angle = atan2(delta.dy, delta.dx);
+    
+    double normalizedAngle = angle + (pi / 2);
+    if (normalizedAngle < 0) normalizedAngle += 2 * pi;
+    
+    double totalHours = (normalizedAngle / (2 * pi)) * 24.0;
+    
+    int hour = totalHours.floor();
+    int minute = ((totalHours - hour) * 60).round();
+    
+    int snap = 5;
+    minute = (minute / snap).round() * snap;
+    if (minute == 60) {
+      minute = 0;
+      hour += 1;
+    }
+    if (hour == 24) hour = 0;
+
+    setState(() {
+      DateTime updateDate(DateTime original) {
+        return DateTime(original.year, original.month, original.day, hour, minute);
+      }
+
+      switch (_draggingHandle) {
+        case _SleepHandle.bed:
+          _bedTime = updateDate(_bedTime);
+          break;
+        case _SleepHandle.asleep:
+          _asleepTime = updateDate(_asleepTime);
+          break;
+        case _SleepHandle.wake:
+          _wakeTime = updateDate(_wakeTime);
+          break;
+        case _SleepHandle.out:
+          _outTime = updateDate(_outTime);
+          break;
+        case _SleepHandle.none:
+          break;
+      }
+    });
+  }
+
+  void _onPanStart(DragStartDetails details) {
+    final Offset local = details.localPosition;
+    final Offset center = Offset(_clockSize / 2, _clockSize / 2);
+    
+    final double touchRadius = (local - center).distance;
+    final double outerRingR = (_clockSize / 2) - _outerPadding;
+    final double innerRingR = (_clockSize / 2) - _innerPadding;
+    final double midRadius = (outerRingR + innerRingR) / 2;
+
+    double getAngularDist(DateTime dt) {
+        final double dx = local.dx - center.dx;
+        final double dy = local.dy - center.dy;
+        double touchAngle = atan2(dy, dx);
+        
+        double totalHours = dt.hour + dt.minute / 60.0;
+        double dtAngle = (totalHours / 24.0) * 2 * pi - (pi / 2);
+        
+        touchAngle = (touchAngle + 2 * pi) % (2 * pi);
+        dtAngle = (dtAngle + 2 * pi) % (2 * pi);
+        
+        double diff = (touchAngle - dtAngle).abs();
+        if (diff > pi) diff = 2 * pi - diff;
+        return diff;
+    }
+
+    _draggingHandle = _SleepHandle.none;
+
+    if (touchRadius > midRadius) {
+       double distBed = getAngularDist(_bedTime);
+       double distOut = getAngularDist(_outTime);
+       if (distBed <= distOut) {
+         _draggingHandle = _SleepHandle.bed;
+       } else {
+         _draggingHandle = _SleepHandle.out;
+       }
     } else {
-      return Card(
-        elevation: 1.0,
-        child: InkWell(
-          onTap: onPressed,
-          borderRadius: BorderRadius.circular(12.0),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              children: [
-                Icon(icon, color: color, size: 28),
-                const SizedBox(width: 16),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: color,
-                      ),
-                    ),
-                    if (subtitle != null)
-                      Text(
-                        subtitle!,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                  ],
+       double distAsleep = getAngularDist(_asleepTime);
+       double distWake = getAngularDist(_wakeTime);
+       if (distAsleep <= distWake) {
+         _draggingHandle = _SleepHandle.asleep;
+       } else {
+         _draggingHandle = _SleepHandle.wake;
+       }
+    }
+
+    // Larger interaction radius for easier grabbing
+    Offset getHandlePos(DateTime dt, double rPadding) {
+      double r = (_clockSize / 2) - rPadding;
+      double totalHours = dt.hour + dt.minute / 60.0;
+      double angle = (totalHours / 24.0) * 2 * pi - (pi / 2);
+      return Offset(center.dx + r * cos(angle), center.dy + r * sin(angle));
+    }
+    
+    // Check linear distance to confirm intent (prevent accidental drags from center)
+    double targetR = (_draggingHandle == _SleepHandle.bed || _draggingHandle == _SleepHandle.out) 
+        ? outerRingR : innerRingR;
+    DateTime targetTime;
+    switch(_draggingHandle) {
+        case _SleepHandle.bed: targetTime = _bedTime; break;
+        case _SleepHandle.out: targetTime = _outTime; break;
+        case _SleepHandle.asleep: targetTime = _asleepTime; break;
+        case _SleepHandle.wake: targetTime = _wakeTime; break;
+        default: targetTime = DateTime.now();
+    }
+    
+    double distToHandle = (local - getHandlePos(targetTime, 
+        (_draggingHandle == _SleepHandle.bed || _draggingHandle == _SleepHandle.out) ? _outerPadding : _innerPadding)
+    ).distance;
+
+    if (distToHandle < 40.0) { // 40px hit area
+      _updateTimeFromTouch(local);
+    } else {
+      _draggingHandle = _SleepHandle.none;
+    }
+  }
+
+  void _onPanUpdate(DragUpdateDetails details) {
+    if (_draggingHandle == _SleepHandle.none) return;
+    _updateTimeFromTouch(details.localPosition);
+  }
+
+  void _onPanEnd(DragEndDetails details) {
+    _draggingHandle = _SleepHandle.none;
+    setState(() {}); // Redraw to remove highlight
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return Dialog(
+      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      insetPadding: EdgeInsets.all(16),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: Container(
+        width: double.maxFinite,
+        padding: const EdgeInsets.all(24.0),
+        child: _currentStep == 1 
+            ? _buildTimeStep(isDark) 
+            : _buildDetailsStep(isDark),
+      ),
+    );
+  }
+
+  // --- STEP 1: TIMES (No Scrolling needed for main clock interaction) ---
+  Widget _buildTimeStep(bool isDark) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          widget.isNew ? "Set Times (1/2)" : "Edit Times (1/2)",
+          style: TextStyle(
+            fontSize: 20, 
+            fontWeight: FontWeight.bold, 
+            color: isDark ? Colors.white70 : Colors.blueGrey[800]
+          ),
+        ),
+        const SizedBox(height: 24),
+        
+        Center(
+          child: SizedBox(
+            width: _clockSize,
+            height: _clockSize,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque, 
+              onPanStart: _onPanStart,
+              onPanUpdate: _onPanUpdate,
+              onPanEnd: _onPanEnd,
+              child: CustomPaint(
+                painter: SleepEditorPainter(
+                  _bedTime, _asleepTime, _wakeTime, _outTime, 
+                  _outerPadding, _innerPadding,
+                  isDark: isDark,
+                  activeHandle: _draggingHandle,
                 ),
-                const Spacer(),
-                Icon(Icons.arrow_forward_ios, color: Colors.grey[400], size: 16),
-              ],
+              ),
             ),
           ),
         ),
+        const SizedBox(height: 24),
+
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _TimeTile(label: "Bed Time", time: _bedTime, color: Colors.indigo, icon: Icons.bed, onTap: () => _pickTime('bed')),
+            _TimeTile(label: "Asleep", time: _asleepTime, color: Colors.cyan, icon: Icons.nights_stay, onTap: () => _pickTime('asleep')),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _TimeTile(label: "Wake Up", time: _wakeTime, color: Colors.cyan, icon: Icons.wb_sunny, onTap: () => _pickTime('wake')),
+            _TimeTile(label: "Out of Bed", time: _outTime, color: Colors.indigo, icon: Icons.directions_walk, onTap: () => _pickTime('out')),
+          ],
+        ),
+
+        const SizedBox(height: 24),
+        
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            TextButton.icon(
+              icon: Icon(Icons.close, size: 18),
+              onPressed: () => Navigator.pop(context), 
+              label: Text("Cancel", style: TextStyle(color: Colors.grey))
+            ),
+            ElevatedButton.icon(
+              icon: Icon(Icons.arrow_forward),
+              onPressed: () {
+                // Basic validation before next
+                if (_asleepTime.isBefore(_bedTime)) {
+                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Asleep time cannot be before Bed time")));
+                   return;
+                }
+                setState(() => _currentStep = 2);
+              }, 
+              label: Text("Next")
+            ),
+          ],
+        )
+      ],
+    );
+  }
+
+  // --- STEP 2: DETAILS ---
+  Widget _buildDetailsStep(bool isDark) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          "Session Details (2/2)",
+          style: TextStyle(
+            fontSize: 20, 
+            fontWeight: FontWeight.bold, 
+            color: isDark ? Colors.white70 : Colors.blueGrey[800]
+          ),
+        ),
+        const SizedBox(height: 32),
+
+        if (_sleepLocations.isNotEmpty)
+          DropdownButtonFormField<String>(
+            value: _locationId,
+            dropdownColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+            decoration: const InputDecoration(
+              labelText: "Sleep Location",
+              border: OutlineInputBorder(),
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              prefixIcon: Icon(Icons.place_outlined),
+            ),
+            items: _sleepLocations.map((cat) {
+              return DropdownMenuItem(
+                value: cat.id,
+                child: Text(cat.name),
+              );
+            }).toList(),
+            onChanged: (val) {
+              if (val != null) setState(() => _locationId = val);
+            },
+          ),
+        
+        const SizedBox(height: 24),
+
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _awakeningsCtrl,
+                decoration: InputDecoration(
+                  labelText: "Awakenings", 
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                  prefixIcon: Icon(Icons.restart_alt),
+                ),
+                keyboardType: TextInputType.number,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: TextField(
+                controller: _awakeMinsCtrl,
+                decoration: InputDecoration(
+                  labelText: "Awake Mins", 
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                  suffixText: "min",
+                  prefixIcon: Icon(Icons.timer_outlined),
+                ),
+                keyboardType: TextInputType.number,
+              ),
+            ),
+          ],
+        ),
+        
+        const SizedBox(height: 32),
+
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            TextButton.icon(
+              icon: Icon(Icons.arrow_back, size: 18),
+              onPressed: () => setState(() => _currentStep = 1), 
+              label: Text("Back", style: TextStyle(color: Colors.grey))
+            ),
+            ElevatedButton.icon(
+              icon: Icon(Icons.check),
+              onPressed: () {
+                final updatedEntry = SleepEntry(
+                  bedTime: _bedTime,
+                  fellAsleepTime: _asleepTime,
+                  wakeTime: _wakeTime,
+                  outOfBedTime: _outTime,
+                  awakeningsCount: int.tryParse(_awakeningsCtrl.text) ?? 0,
+                  awakeDurationMinutes: int.tryParse(_awakeMinsCtrl.text) ?? 0,
+                  sleepLocationId: _locationId
+                );
+                widget.onSave(updatedEntry);
+                Navigator.pop(context);
+              }, 
+              label: Text("Save Session")
+            ),
+          ],
+        )
+      ],
+    );
+  }
+}
+
+class _TimeTile extends StatelessWidget {
+  final String label;
+  final DateTime time;
+  final Color color;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _TimeTile({required this.label, required this.time, required this.color, required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: 100,
+        padding: EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: color.withOpacity(isDark ? 0.25 : 0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withOpacity(isDark ? 0.5 : 0.3))
+        ),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 14, color: isDark ? Colors.grey[400] : Colors.grey[700]), 
+                SizedBox(width: 4),
+                Text(label, style: TextStyle(fontSize: 12, color: isDark ? Colors.grey[400] : Colors.grey[700], fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(DateFormat('HH:mm').format(time), style: TextStyle(fontSize: 18, color: color, fontWeight: FontWeight.bold)),
+            Text(DateFormat('MMM dd').format(time), style: TextStyle(fontSize: 12, color: isDark ? Colors.grey[500] : Colors.grey[600])), 
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class SleepEditorPainter extends CustomPainter {
+  final DateTime bedTime;
+  final DateTime asleepTime;
+  final DateTime wakeTime;
+  final DateTime outTime;
+  final double outerPadding;
+  final double innerPadding;
+  final bool isDark;
+  final _SleepHandle activeHandle; // New parameter
+
+  SleepEditorPainter(
+    this.bedTime, this.asleepTime, this.wakeTime, this.outTime,
+    this.outerPadding, this.innerPadding, {this.isDark = false, this.activeHandle = _SleepHandle.none}
+  );
+
+  double getAngle(DateTime dt) {
+    // 0 is Top (-pi/2)
+    // 24h clock
+    double totalHours = dt.hour + dt.minute / 60.0;
+    return (totalHours / 24.0) * 2 * pi - (pi / 2);
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = min(size.width, size.height) / 2;
+
+    // Background Circle
+    final bgPaint = Paint()..color = isDark ? const Color(0xFF121212) : Colors.grey[200]!;
+    canvas.drawCircle(center, radius, bgPaint);
+
+    // Ticks & Numbers
+    final tickPaint = Paint()..color = isDark ? Colors.grey[700]! : Colors.grey[400]!..strokeWidth = 1;
+    final textPainter = TextPainter(textDirection: ui.TextDirection.ltr);
+
+    for (int i = 0; i < 24; i += 2) {
+      double angle = (i / 24.0) * 2 * pi - (pi / 2);
+      
+      // Tick
+      canvas.drawLine(
+        Offset(center.dx + (radius - 5) * cos(angle), center.dy + (radius - 5) * sin(angle)),
+        Offset(center.dx + radius * cos(angle), center.dy + radius * sin(angle)),
+        tickPaint
       );
+
+      // Number
+      if (i % 6 == 0) {
+        textPainter.text = TextSpan(text: i.toString(), style: TextStyle(fontSize: 10, color: isDark ? Colors.grey[500] : Colors.grey[600]));
+        textPainter.layout();
+        canvas.drawText(
+          textPainter, 
+          Offset(center.dx + (radius - 20) * cos(angle) - textPainter.width/2, center.dy + (radius - 20) * sin(angle) - textPainter.height/2)
+        );
+      }
     }
+
+    // --- ARCS ---
+    final bedStartAngle = getAngle(bedTime);
+    final outAngle = getAngle(outTime);
+    
+    // Calculate sweep. Handle day wrap.
+    double bedSweep = outAngle - bedStartAngle;
+    if (bedSweep <= 0) bedSweep += 2 * pi;
+
+    final bedPaint = Paint()
+      ..color = Colors.indigo.withOpacity(0.3)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 24
+      ..strokeCap = StrokeCap.round;
+    
+    // Draw Bed Arc (Outer)
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius - outerPadding), 
+      bedStartAngle, 
+      bedSweep, 
+      false, 
+      bedPaint
+    );
+
+    final asleepStartAngle = getAngle(asleepTime);
+    final wakeAngle = getAngle(wakeTime);
+    
+    double sleepSweep = wakeAngle - asleepStartAngle;
+    if (sleepSweep <= 0) sleepSweep += 2 * pi;
+
+    final sleepPaint = Paint()
+      ..color = Colors.cyan.withOpacity(0.6)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 24
+      ..strokeCap = StrokeCap.round;
+
+    // Draw Sleep Arc (Inner)
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius - innerPadding), 
+      asleepStartAngle, 
+      sleepSweep, 
+      false, 
+      sleepPaint
+    );
+
+    // --- HANDLES / ICONS ---
+    // Helper to draw handle with active state
+    void drawHandle(double angle, double r, Color c, IconData icon, _SleepHandle handleType) {
+      final pos = Offset(center.dx + r * cos(angle), center.dy + r * sin(angle));
+      
+      final bool isActive = activeHandle == handleType;
+      final double size = isActive ? 22.0 : 14.0; // Larger when active, easier to see
+
+      // Shadow
+      canvas.drawCircle(
+        pos, 
+        size, 
+        Paint()
+          ..color = Colors.black26
+          ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 4)
+      );
+      
+      // Handle - Dark Charcoal in Dark Mode
+      canvas.drawCircle(pos, size, Paint()..color = isDark ? const Color(0xFF2C2C2C) : Colors.white);
+      // Dot
+      canvas.drawCircle(pos, 4, Paint()..color = c);
+    }
+
+    drawHandle(bedStartAngle, radius - outerPadding, Colors.indigo, Icons.bed, _SleepHandle.bed);
+    drawHandle(outAngle, radius - outerPadding, Colors.indigo, Icons.directions_walk, _SleepHandle.out);
+    
+    drawHandle(asleepStartAngle, radius - innerPadding, Colors.cyan, Icons.nights_stay, _SleepHandle.asleep);
+    drawHandle(wakeAngle, radius - innerPadding, Colors.cyan, Icons.wb_sunny, _SleepHandle.wake);
+  }
+  
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+// Extension to help canvas.drawText (Flutter standard canvas doesn't have drawText directly, uses TextPainter.paint)
+extension CanvasText on Canvas {
+  void drawText(TextPainter tp, Offset offset) {
+    tp.paint(this, offset);
   }
 }
