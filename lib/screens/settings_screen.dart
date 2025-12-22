@@ -51,16 +51,15 @@ class SettingsScreen extends StatelessWidget {
                 },
               ),
               const SizedBox(height: 20),
-              Text(
+              const Text(
                 'All your log data is saved locally on this device. Clearing data is permanent and cannot be undone.',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+                 style: TextStyle(fontSize: 14, color: Colors.grey),
               ),
-              const SizedBox(height: 32),
-              
+              const SizedBox(height: 20),
               // --- CATEGORIES MANAGEMENT BUTTON ---
               ElevatedButton.icon(
-                icon: Icon(Icons.category_outlined),
+                 icon: const Icon(Icons.category_outlined),
                 label: const Text('Manage Categories'),
                 onPressed: () {
                   Navigator.push(
@@ -73,7 +72,7 @@ class SettingsScreen extends StatelessWidget {
 
               // --- CSV EXPORT BUTTON ---
               ElevatedButton.icon(
-                icon: Icon(Icons.download),
+                icon: const Icon(Icons.download),
                 label: const Text('Export Data as CSV'),
                 onPressed: () async {
                   await LogService().exportToCsv(context);
@@ -82,7 +81,7 @@ class SettingsScreen extends StatelessWidget {
               const SizedBox(height: 20),
               
               OutlinedButton.icon(
-                icon: Icon(Icons.delete_forever_outlined),
+                icon: const Icon(Icons.delete_forever_outlined),
                 label: const Text('Clear All Saved Data'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.red[700],
@@ -92,16 +91,16 @@ class SettingsScreen extends StatelessWidget {
                   final bool? confirmed = await showDialog<bool>(
                     context: context,
                     builder: (context) => AlertDialog(
-                      title: Text('Are you sure?'),
+                      title: const Text('Are you sure?'),
                       content:
-                          Text('This will delete all saved data permanently.'),
+                          const Text('This will delete all saved data permanently.'),
                       actions: [
                         TextButton(
-                          child: Text('Cancel'),
+                          child: const Text('Cancel'),
                           onPressed: () => Navigator.pop(context, false),
                         ),
                         TextButton(
-                          child: Text('Delete',
+                          child: const Text('Delete',
                               style: TextStyle(color: Colors.red)),
                           onPressed: () => Navigator.pop(context, true),
                         ),
@@ -113,7 +112,7 @@ class SettingsScreen extends StatelessWidget {
                     await LogService().clearAllData();
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
+                        const SnackBar(
                             content: Text('All saved data has been cleared!')),
                       );
                       Navigator.of(context).popUntil((route) => route.isFirst);
