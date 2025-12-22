@@ -1,4 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- The manifest tag must close above with a '>' before adding permissions -->
+
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.VIBRATE" />
+
     <application
         android:label="sleep_draft_three"
         android:name="${applicationName}"
