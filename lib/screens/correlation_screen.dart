@@ -1,0 +1,330 @@
+import 'dart:math';
+import 'dart:ui' as ui;
+import 'package:flutter/material.dart';
+import '../models.dart';
+import '../log_service.dart';
+
+class CorrelationScreen extends StatefulWidget {
+  const CorrelationScreen({super.key});
+
+  @override
+  State<CorrelationScreen> createState() => _CorrelationScreenState();
+}
+
+enum _HabitType { caffeine, alcohol, exercise }
+
+class _ScatterPoint {
+  final double time; // 0-24 hour format (relative to bed time day)
+  final double latency; // minutes
+  final _HabitType type;
+  
+  _ScatterPoint(this.time, this.latency, this.type);
+}
+
+class _CorrelationScreenState extends State<CorrelationScreen> {
+  final LogService _logService = LogService();
+  List<_ScatterPoint> _points = [];
+  bool _isLoading = true;
+
+  // Settings
+  final int _daysToAnalyze = 60; 
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+    
+    final allLogs = await _logService.getAllLogs();
+    List<_ScatterPoint> points = [];
+    
+    final sortedKeys = allLogs.keys.toList()..sort();
+    final cutoff = DateTime.now().subtract(Duration(days: _daysToAnalyze));
+    final recentKeys = sortedKeys.where((d) => d.isAfter(cutoff));
+
+    for (var date in recentKeys) {
+      final log = allLogs[date]!;
+      if (log.sleepLog.isEmpty) continue;
+
+      // Analyze the first sleep session of this log
+      final sleepEntry = log.sleepLog.first; 
+      
+      double latency = sleepEntry.sleepLatencyMinutes.toDouble();
+      if (latency < 0) latency = 0;
+      if (latency > 180) latency = 180; 
+
+      DateTime bedTime = sleepEntry.bedTime;
+
+      // --- FETCH HABITS FROM CURRENT AND PREVIOUS DAY ---
+      // This solves the issue where Coffee (16th 21:00) affects Sleep (17th log, bed 23:00 16th)
+      List<SubstanceEntry> combinedSubstances = [];
+      List<ExerciseEntry> combinedExercise = [];
+
+      // 1. Current Day
+      combinedSubstances.addAll(log.substanceLog);
+      combinedExercise.addAll(log.exerciseLog);
+
+      // 2. Previous Day
+      final prevDate = date.subtract(const Duration(days: 1));
+      // Need to find the key that matches prevDate (ignoring time components if keys differ slightly, though getAllLogs uses normalized UTC usually)
+      // Assuming keys are normalized YMD:
+      final prevDateNormalized = DateTime.utc(prevDate.year, prevDate.month, prevDate.day);
+      
+      // Try exact match or loose match if keys vary
+      if (allLogs.containsKey(prevDateNormalized)) {
+        final prevLog = allLogs[prevDateNormalized]!;
+        combinedSubstances.addAll(prevLog.substanceLog);
+        combinedExercise.addAll(prevLog.exerciseLog);
+      } else {
+         // Fallback loop if keys aren't strictly UTC normalized in map
+         for(var k in allLogs.keys) {
+            if(k.year == prevDate.year && k.month == prevDate.month && k.day == prevDate.day) {
+               combinedSubstances.addAll(allLogs[k]!.substanceLog);
+               combinedExercise.addAll(allLogs[k]!.exerciseLog);
+               break;
+            }
+         }
+      }
+
+      // --- ANALYZE HABITS ---
+
+      // Helper to find latest event before bedtime
+      DateTime? findLatestTime(List<DateTime> times) {
+        DateTime? latest;
+        for (var t in times) {
+          if (t.isBefore(bedTime)) {
+            // Filter: Only look at habits within 12 hours of bed time to avoid irrelevant morning coffee from yesterday
+            if (bedTime.difference(t).inHours < 16) { 
+               if (latest == null || t.isAfter(latest)) {
+                 latest = t;
+               }
+            }
+          }
+        }
+        return latest;
+      }
+
+      // 1. Caffeine
+      List<DateTime> caffeineTimes = combinedSubstances
+          .where((s) => ['coffee', 'tea', 'cola', 'energy_drink'].contains(s.substanceTypeId))
+          .map((s) => s.time)
+          .toList();
+      
+      DateTime? lastCaffeine = findLatestTime(caffeineTimes);
+      if (lastCaffeine != null) {
+        points.add(_ScatterPoint(_timeToDouble(lastCaffeine), latency, _HabitType.caffeine));
+      }
+
+      // 2. Alcohol
+      List<DateTime> alcoholTimes = combinedSubstances
+          .where((s) => ['alcohol', 'wine', 'beer'].contains(s.substanceTypeId))
+          .map((s) => s.time)
+          .toList();
+
+      DateTime? lastAlcohol = findLatestTime(alcoholTimes);
+      if (lastAlcohol != null) {
+        points.add(_ScatterPoint(_timeToDouble(lastAlcohol), latency, _HabitType.alcohol));
+      }
+
+      // 3. Exercise
+      List<DateTime> exerciseTimes = combinedExercise.map((e) => e.finishTime).toList();
+      DateTime? lastExercise = findLatestTime(exerciseTimes);
+      if (lastExercise != null) {
+         points.add(_ScatterPoint(_timeToDouble(lastExercise), latency, _HabitType.exercise));
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _points = points;
+        _isLoading = false;
+      });
+    }
+  }
+
+  double _timeToDouble(DateTime t) {
+    return t.hour + t.minute / 60.0;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Scaffold(
+      appBar: AppBar(title: const Text("Habits vs. Sleep Latency")),
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator())
+        : Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  "Impact of Habits on Falling Asleep",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  "Higher dots = Longer time to fall asleep.",
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[50],
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.grey.withOpacity(0.2)),
+                    ),
+                    child: _points.isEmpty 
+                      ? const Center(child: Text("Not enough habit data logged yet."))
+                      : CustomPaint(
+                          painter: ScatterPlotPainter(_points, isDark),
+                        ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                // Legend
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _LegendItem(color: Colors.brown, label: "Caffeine", icon: Icons.coffee),
+                    const SizedBox(width: 12),
+                    _LegendItem(color: Colors.purple, label: "Alcohol", icon: Icons.local_bar),
+                    const SizedBox(width: 12),
+                    _LegendItem(color: Colors.orange, label: "Exercise", icon: Icons.fitness_center),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Center(
+                   child: Text(
+                     "X-Axis: Time of Habit  •  Y-Axis: Minutes to Fall Asleep",
+                     style: TextStyle(fontSize: 10, color: Colors.grey),
+                   )
+                ),
+              ],
+            ),
+          )
+    );
+  }
+}
+
+class _LegendItem extends StatelessWidget {
+  final Color color;
+  final String label;
+  final IconData icon;
+  const _LegendItem({required this.color, required this.label, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 4),
+        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+      ],
+    );
+  }
+}
+
+class ScatterPlotPainter extends CustomPainter {
+  final List<_ScatterPoint> points;
+  final bool isDark;
+
+  ScatterPlotPainter(this.points, this.isDark);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paddingLeft = 30.0;
+    final paddingBottom = 20.0;
+    final graphW = size.width - paddingLeft;
+    final graphH = size.height - paddingBottom;
+
+    final paintGrid = Paint()
+      ..color = Colors.grey.withOpacity(0.2)
+      ..strokeWidth = 1;
+
+    final textPainter = TextPainter(textDirection: ui.TextDirection.ltr);
+
+    // 1. Draw Axis & Labels
+    // Y-Axis: Latency (0 to ~120 mins)
+    for (int i = 0; i <= 4; i++) {
+      double y = graphH - (i * (graphH / 4));
+      canvas.drawLine(Offset(paddingLeft, y), Offset(size.width, y), paintGrid);
+      
+      textPainter.text = TextSpan(
+        text: "${i * 30}m",
+        style: TextStyle(color: Colors.grey, fontSize: 10),
+      );
+      textPainter.layout();
+      canvas.drawText(textPainter, Offset(0, y - textPainter.height / 2));
+    }
+
+    // X-Axis: Time (06:00 to 24:00 typically)
+    double minHour = 6;
+    double maxHour = 24;
+    
+    for (int i = 6; i <= 24; i+=3) {
+      double x = paddingLeft + ((i - minHour) / (maxHour - minHour)) * graphW;
+      
+      if (i <= 24) { 
+        canvas.drawLine(Offset(x, 0), Offset(x, graphH), paintGrid);
+        
+        textPainter.text = TextSpan(
+          text: "${i.toString().padLeft(2,'0')}:00",
+          style: TextStyle(color: Colors.grey, fontSize: 10),
+        );
+        textPainter.layout();
+        canvas.drawText(textPainter, Offset(x - textPainter.width/2, graphH + 5));
+      }
+    }
+
+    // 2. Draw Points
+    final paintCaffeine = Paint()..color = Colors.brown..style = PaintingStyle.fill;
+    final paintAlcohol = Paint()..color = Colors.purple..style = PaintingStyle.fill;
+    final paintExercise = Paint()..color = Colors.orange..style = PaintingStyle.fill;
+
+    for (var p in points) {
+      // Scale X (Time)
+      double t = p.time;
+      if (t < 6) t += 24; // Map late night hours (0-6am) to end of axis (24-30)
+
+      // Normalize X to grid
+      double x = paddingLeft + ((t - minHour) / (maxHour - minHour)) * graphW;
+      
+      // Scale Y (Latency)
+      double l = p.latency > 120 ? 120 : p.latency;
+      double y = graphH - (l / 120.0) * graphH;
+
+      // Only draw if within bounds (ignore events way before 6am if any)
+      if (x >= paddingLeft && x <= size.width + 10) { 
+        Paint targetPaint;
+        switch (p.type) {
+          case _HabitType.caffeine: targetPaint = paintCaffeine; break;
+          case _HabitType.alcohol: targetPaint = paintAlcohol; break;
+          case _HabitType.exercise: targetPaint = paintExercise; break;
+        }
+
+        canvas.drawCircle(Offset(x, y), 5, targetPaint);
+        canvas.drawCircle(Offset(x, y), 5, Paint()..color = isDark ? Colors.white70 : Colors.black26 ..style = PaintingStyle.stroke ..strokeWidth = 1);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+extension CanvasText on Canvas {
+  void drawText(TextPainter tp, Offset offset) {
+    tp.paint(this, offset);
+  }
+}
