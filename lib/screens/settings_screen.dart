@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../log_service.dart';
 import 'category_management_screen.dart';
+import '../app.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -9,7 +10,7 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Settings'),
+        title: const Text('Settings'),
         centerTitle: true,
       ),
       body: Center(
@@ -28,6 +29,26 @@ class SettingsScreen extends StatelessWidget {
                     .headlineSmall
                     ?.copyWith(fontWeight: FontWeight.w600),
                 textAlign: TextAlign.center,
+              ),const SizedBox(height: 30),
+
+              // --- DARK MODE TOGGLE ---
+              ValueListenableBuilder<ThemeMode>(
+                valueListenable: themeNotifier,
+                builder: (context, mode, child) {
+                  final isDark = mode == ThemeMode.dark;
+                  return Card(
+                    child: SwitchListTile(
+                      title: const Text("Dark Mode"),
+                      secondary: Icon(isDark ? Icons.dark_mode : Icons.light_mode),
+                      value: isDark,
+                      activeColor: Colors.indigoAccent,
+                      onChanged: (val) {
+                        themeNotifier.value = val ? ThemeMode.dark : ThemeMode.light;
+                        LogService().setDarkMode(val);
+                      },
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 20),
               Text(
