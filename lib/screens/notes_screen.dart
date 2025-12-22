@@ -13,6 +13,7 @@ class _NotesScreenState extends State<NotesScreen> {
   final _controller = TextEditingController();
   final LogService _logService = LogService();
   bool _isLoading = true;
+  String _originalText = "";
 
   @override
   void initState() {
@@ -24,8 +25,10 @@ class _NotesScreenState extends State<NotesScreen> {
     try {
       setState(() => _isLoading = true);
       final log = await _logService.getDailyLog(widget.date);
+      final notes = log.notes ?? "";
       setState(() {
-        _controller.text = log.notes ?? "";
+        _controller.text = notes;
+        _originalText = notes;
       });
     } catch (e) {
        // handle error
@@ -35,19 +38,19 @@ class _NotesScreenState extends State<NotesScreen> {
   }
 
   Future<void> _saveNotes() async {
-    final log = await _logService.getDailyLog(widget.date);
-    log.notes = _controller.text;
-    await _logService.saveDailyLog(widget.date, log);
-
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Notes saved!')),
-      );
+    if (_controller.text == _originalText) return;
+     try {
+      final log = await _logService.getDailyLog(widget.date);
+      log.notes = _controller.text;
+      await _logService.saveDailyLog(widget.date, log);
+      // print("Notes auto-saved");
+    } catch (e) { // print("Error auto-saving notes: $e");
     }
-  }
+   }
 
   @override
   void dispose() {
+    _saveNotes();
     _controller.dispose();
     super.dispose();
   }
@@ -57,13 +60,6 @@ class _NotesScreenState extends State<NotesScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Notes'),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.save_outlined),
-            onPressed: _saveNotes,
-            tooltip: 'Save Notes',
-          ),
-        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -74,9 +70,9 @@ class _NotesScreenState extends State<NotesScreen> {
                   padding: const EdgeInsets.all(8.0),
                   child: TextField(
                     controller: _controller,
-                    decoration: InputDecoration(
+                      decoration: const InputDecoration(
                       hintText: "Write your notes here...",
-                      hintStyle: const TextStyle(
+                        hintStyle: TextStyle(
                         color: Color(0xffDDDADA),
                         fontSize: 14,
                       ),
