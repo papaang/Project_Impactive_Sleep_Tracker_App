@@ -7,7 +7,6 @@
 *This project will no longer be worked on from dd/mm/yyyy, but can be used and modified under the terms of the GPLv3 Licence (link to licensing section).*
 
 - [Key features](#key-features)
-- [About](#about)
 - [Installation instructions](#installation-instructions)
 - [Video tutorial](#video-tutorial)
 - [Contact](#contact)
