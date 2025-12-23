@@ -5,7 +5,9 @@ import '../log_service.dart';
 
 class ExerciseScreen extends StatefulWidget {
   final DateTime date;
-  const ExerciseScreen({super.key, required this.date});
+  final bool autoOpenAdd; // Added for notification shortcut
+
+  const ExerciseScreen({super.key, required this.date, this.autoOpenAdd = false});
 
   @override
   State<ExerciseScreen> createState() => _ExerciseScreenState();
@@ -32,6 +34,12 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
         _log = log;
         _exerciseTypes = exerciseTypes;
       });
+
+      // Handle auto-open if requested
+      if (widget.autoOpenAdd && mounted) {
+        Future.delayed(const Duration(milliseconds: 300), _addExerciseEntry);
+      }
+
     } catch (e) {
        // handle error
     } finally {
@@ -56,7 +64,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     final Category? selectedType = await showDialog<Category>(
       context: context,
       builder: (context) => SimpleDialog(
-        title: Text('Select Activity Type'),
+        title: const Text('Select Activity Type'),
         children: _exerciseTypes.map((cat) => SimpleDialogOption(
           onPressed: () => Navigator.pop(context, cat),
           child: Row(
@@ -101,7 +109,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     if (finishDateTime.isBefore(startDateTime)) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Finish time cannot be before start time.')),
+          const SnackBar(content: Text('Finish time cannot be before start time.')),
         );
       }
       return;
@@ -141,7 +149,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Exercise', style: TextStyle(fontSize: 20)),
+           const Text('Exercise', style: TextStyle(fontSize: 20)),
             Text(
               displayDate,
               style: const TextStyle(
@@ -181,11 +189,11 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
                           leading: Icon(Icons.fitness_center,
                               color: Colors.orange[800]),
                           title: Text(item.type,
-                              style: TextStyle(fontWeight: FontWeight.bold)),
+                              style: const TextStyle(fontWeight: FontWeight.bold)),
                           subtitle: Text(
                               '${DateFormat('h:mm a').format(item.startTime)} - ${DateFormat('h:mm a').format(item.finishTime)} (${_getDuration(item.startTime, item.finishTime)})'),
                           trailing: IconButton(
-                            icon: Icon(Icons.delete_outline, color: Colors.red),
+                            icon: const Icon(Icons.delete_outline, color: Colors.red),
                             onPressed: () => _deleteExerciseEntry(idx),
                           ),
                         ),
