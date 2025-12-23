@@ -1,19 +1,29 @@
 import 'dart:math'; // Required for the clock calculations
-import 'dart:ui' as ui; // Added to resolve TextDirection ambiguity
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart'; // Required for response type
 import '../log_service.dart';
+import '../notification_service.dart'; // Import the new service
 import '../models.dart';
 import 'event_screen.dart';
 import 'stats_screen.dart';
 import 'calendar_screen.dart';
 import 'settings_screen.dart';
+import 'category_management_screen.dart'; // Import for Manage Categories
+
 // Specific Activity Screens
 import 'medication_screen.dart';
+import 'caffeine_alcohol_screen.dart';
 import 'exercise_screen.dart';
 import 'notes_screen.dart';
-import 'category_management_screen.dart';
+import 'sleep_graph_screen.dart'; 
+import 'sleep_heatmap_screen.dart'; 
+import 'mid_sleep_graph_screen.dart'; 
+import 'sleep_efficiency_screen.dart';
+import 'correlation_screen.dart';
+
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -27,6 +37,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   String _sleepMessage = "Welcome! Tap 'Going to sleep' to start.";
   bool _isLoading = true;
   final LogService _logService = LogService();
+  final NotificationService _notificationService = NotificationService(); 
   List<Category> _dayTypes = [];
   
   DateTime _loadedDate = DateTime.now(); 
@@ -35,7 +46,38 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _notificationService.init(_handleNotificationResponse);
     _loadTodayLog();
+  }
+
+  void _handleNotificationResponse(NotificationResponse response) async {
+    if (response.actionId == 'add_meds') {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => MedicationScreen(date: _loadedDate, autoOpenAdd: true)),
+      );
+      _loadTodayLog();
+    } else if (response.actionId == 'add_caffeine') {
+       await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => CaffeineAlcoholScreen(date: _loadedDate, autoOpenAdd: true)),
+      );
+      _loadTodayLog();
+    } else if (response.actionId == 'add_exercise') {
+       await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => ExerciseScreen(date: _loadedDate, autoOpenAdd: true)),
+      );
+      _loadTodayLog();
+    } else if (response.actionId == 'sleep') {
+      if (!_todayLog.isSleeping) await _handleGoingToSleep();
+    } else if (response.actionId == 'wake_up') {
+      if (_todayLog.isSleeping) await _handleWakingUp();
+    }
+  }
+
+  void _updateNotification() {
+    _notificationService.showPersistentControls(isSleeping: _todayLog.isSleeping);
   }
 
   @override
@@ -48,6 +90,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _checkDayChange();
+      _loadTodayLog(); 
     }
   }
 
@@ -101,10 +144,44 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           }
         }
       });
+      _updateNotification();
     } catch (e) {
       setState(() => _sleepMessage = "Error loading data. Please try again.");
     } finally {
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _addOneCaffeine() async {
+    int cups = 1; // Default to 1 cup
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    if (!isSameDay(_loadedDate, today)) {
+      _loadedDate = today;
+      _todayLog = await _logService.getDailyLog(today);
+    }
+
+    final newEntry = SubstanceEntry(
+      substanceTypeId: 'coffee',
+      amount: cups.toString(),
+      time: now,
+    );
+    
+    setState(() {
+      _todayLog.substanceLog.add(newEntry);
+    });
+    
+    await _logService.saveDailyLog(_loadedDate, _todayLog);
+
+    // Show brief notification
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$cups cup of caffeine logged at ${DateFormat('h:mm a').format(now)}'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
     }
   }
 
@@ -128,6 +205,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
     
     await _logService.saveDailyLog(_loadedDate, _todayLog);
+    _updateNotification();
   }
 
   Future<void> _handleWakingUp() async {
@@ -163,6 +241,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
 
     await _logService.saveDailyLog(_loadedDate, _todayLog);
+    _updateNotification();
   }
 
   Future<void> _handleOutOfBed() async {
@@ -194,6 +273,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
 
     await _logService.saveDailyLog(_loadedDate, _todayLog);
+    _updateNotification();
     
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -202,35 +282,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
        print("Sleep cycle finished for yesterday. Switching to today.");
        await Future.delayed(Duration(milliseconds: 500));
        _loadTodayLog(); 
-    }
-  }
-
-  Future<void> _addOneCaffeine() async {
-    int cups = 1; // Default to 1 cup
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-
-    if (!isSameDay(_loadedDate, today)) {
-      _loadedDate = today;
-      _todayLog = await _logService.getDailyLog(today);
-    }
-
-    final newEntry = SubstanceEntry(
-      substanceTypeId: 'coffee',
-      amount: cups.toString(),
-      time: now,
-    );
-    _todayLog.substanceLog.add(newEntry);
-    await _logService.saveDailyLog(_loadedDate, _todayLog);
-
-    // Show brief notification
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$cups cup of caffeine logged at ${DateFormat('h:mm a').format(now)}'),
-          duration: Duration(seconds: 2),
-        ),
-      );
     }
   }
 
@@ -253,6 +304,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ),
               );
             }),
+            // Option to add new day types inline (Other...)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(context, Category(id: '__new__', name: 'Other', iconName: 'add', colorHex: '0xFF000000')),
+              child: Row(
+                children: const [
+                  Icon(Icons.add, color: Colors.grey),
+                  SizedBox(width: 16),
+                  Text('Other...'),
+                ],
+              ),
+            ),
+            const Divider(),
+            // Manage Categories Option
             SimpleDialogOption(
               onPressed: () async {
                 Navigator.pop(context); // Close the dialog
@@ -267,9 +331,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 });
               },
               child: Row(
-                children: [
+                children: const [
                   Icon(Icons.settings, color: Colors.grey),
-                  const SizedBox(width: 16),
+                  SizedBox(width: 16),
                   Text('Manage Categories'),
                 ],
               ),
@@ -280,10 +344,61 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
 
     if (selectedType != null) {
-      setState(() {
-        _todayLog.dayTypeId = selectedType.id;
-      });
-      await _logService.saveDailyLog(_loadedDate, _todayLog);
+      if (selectedType.id == '__new__') {
+        final TextEditingController textController = TextEditingController();
+        final String? newName = await showDialog<String>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('New Day Type'),
+            content: TextField(
+              controller: textController,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Category Name',
+                hintText: 'e.g. Study, Sick Day',
+              ),
+              textCapitalization: TextCapitalization.sentences,
+            ),
+            actions: [
+              TextButton.icon(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close, size: 18),
+                label: const Text('Cancel'),
+              ),
+              ElevatedButton.icon(
+                onPressed: () => Navigator.pop(context, textController.text),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Add'),
+              ),
+            ],
+          ),
+        );
+
+        if (newName != null && newName.trim().isNotEmpty) {
+          final String name = newName.trim();
+          final String id = name.toLowerCase().replaceAll(RegExp(r'\s+'), '_') + '_${DateTime.now().millisecondsSinceEpoch}';
+          
+          final newCategory = Category(
+            id: id,
+            name: name,
+            iconName: 'wb_sunny_outlined',
+            colorHex: '0xFF607D8B', 
+          );
+
+          setState(() {
+            _dayTypes.add(newCategory);
+            _todayLog.dayTypeId = newCategory.id;
+          });
+          
+          await CategoryManager().saveCategories('day_types', _dayTypes);
+          await _logService.saveDailyLog(_loadedDate, _todayLog);
+        }
+      } else {
+        setState(() {
+          _todayLog.dayTypeId = selectedType.id;
+        });
+        await _logService.saveDailyLog(_loadedDate, _todayLog);
+      }
     }
   }
 
@@ -293,6 +408,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final bool isAwakeInBed = _todayLog.isAwakeInBed;
     // Always show clock if there is data, or if requested to always be visible
     final bool showClock = _todayLog.sleepLog.isNotEmpty || isAsleep || isAwakeInBed;
+    
+    // Check Dark Mode
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
 
     // Resolve Day Type for display
     final Category? currentDayType = _dayTypes
@@ -405,7 +523,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 16, 
-                                color: Colors.blueGrey[800], 
+                                color: isDark ? Colors.white70 : Colors.blueGrey[800], 
                                 height: 1.4,
                                 fontWeight: FontWeight.w500
                               ),
@@ -414,9 +532,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             if (showClock) ...[
                               const SizedBox(height: 24),
                               SleepClock(
-                                sleepLog: _todayLog.sleepLog,
+                                dailyLog: _todayLog, // Pass the whole log
                                 isSleeping: isAsleep,
                                 bedTime: _todayLog.currentBedTime,
+                                isDark: isDark,
                               ),
                             ],
                           ],
@@ -471,9 +590,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       child: Container(
                         padding: EdgeInsets.symmetric(vertical: 16, horizontal: 20),
                         decoration: BoxDecoration(
-                          color: currentDayType?.color.withAlpha(26) ?? Colors.grey[200],
+                          color: currentDayType?.color.withOpacity(0.1) ?? (isDark ? Colors.grey[800] : Colors.grey[200]),
                           border: Border.all(
-                            color: currentDayType?.color ?? Colors.grey[400]!,
+                            color: currentDayType?.color ?? (isDark ? Colors.grey[700]! : Colors.grey[400]!),
                             width: 1.5,
                           ),
                           borderRadius: BorderRadius.circular(16),
@@ -491,7 +610,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: currentDayType?.color ?? Colors.grey[700],
+                                color: currentDayType?.color ?? (isDark ? Colors.grey[400] : Colors.grey[700]),
                               ),
                             ),
                           ],
@@ -500,14 +619,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ),
 
                     const SizedBox(height: 32),
-                    const Divider(height: 1, color: Colors.black12),
+                    Divider(height: 1, color: isDark ? Colors.grey[800] : Colors.black12),
                     const SizedBox(height: 32),
                     
-                    // --- ACTIVITIES GRID (Replaces "Add Event" button) ---
+                    // --- ACTIVITIES GRID ---
                     Text(
                       "Activities & Logs", 
                       style: TextStyle(
-                        color: Colors.grey[600], 
+                        color: isDark ? Colors.grey[400] : Colors.grey[600], 
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
                         letterSpacing: 1.0,
@@ -534,11 +653,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             ).then((_) => _loadTodayLog());
                           },
                         ),
+                        // --- UPDATED: Quick Add Caffeine Button ---
                         _SquareButton(
-                          icon: Icons.coffee_outlined,
+                          icon: Icons.coffee,
                           label: "+1 Caffeine",
                           color: Colors.brown,
-                          onPressed: _addOneCaffeine,
+                          onPressed: _addOneCaffeine, // Quick Add
+                          onLongPress: () { // Full Screen on Long Press
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => CaffeineAlcoholScreen(date: _loadedDate)),
+                            ).then((_) => _loadTodayLog());
+                          },
                         ),
                         _SquareButton(
                           icon: Icons.fitness_center_outlined,
@@ -562,6 +688,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             ).then((_) => _loadTodayLog());
                           },
                         ),
+                        // --- STATS & GRAPHS ---
                         _SquareButton(
                           icon: Icons.bar_chart,
                           label: "Statistics",
@@ -571,6 +698,47 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           },
                         ),
                         _SquareButton(
+                          icon: Icons.ssid_chart,
+                          label: "Sleep Graph",
+                          color: Colors.indigoAccent,
+                          onPressed: () {
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const SleepGraphScreen()));
+                          },
+                        ),
+                        _SquareButton(
+                          icon: Icons.grid_on,
+                          label: "Heatmap",
+                          color: Colors.deepPurpleAccent,
+                          onPressed: () {
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const SleepHeatmapScreen()));
+                          },
+                        ),
+                        _SquareButton(
+                          icon: Icons.show_chart, 
+                          label: "Circadian Drift",
+                          color: Colors.tealAccent.shade700,
+                          onPressed: () {
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const MidSleepGraphScreen()));
+                          },
+                        ),
+                        _SquareButton(
+                          icon: Icons.scatter_plot, 
+                          label: "Correlations",
+                          color: Colors.orangeAccent.shade700,
+                          onPressed: () {
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const CorrelationScreen()));
+                          },
+                        ),
+                        _SquareButton(
+                          icon: Icons.pie_chart_outline,
+                          label: "Efficiency",
+                          color: Colors.blueAccent,
+                          onPressed: () {
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const SleepEfficiencyScreen()));
+                          },
+                        ),
+                      
+                        _SquareButton(
                           icon: Icons.calendar_month_outlined,
                           label: "History",
                           color: Colors.teal,
@@ -579,6 +747,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                               context,
                               MaterialPageRoute(builder: (_) => const CalendarScreen()),
                             ).then((_) => _loadTodayLog());
+                          },
+                        ),
+                        _SquareButton(
+                          icon: Icons.settings_outlined,
+                          label: "Settings",
+                          color: Colors.blueGrey,
+                          onPressed: () {
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
                           },
                         ),
                       ],
@@ -597,31 +773,50 @@ class _SquareButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback? onPressed;
+  final VoidCallback? onLongPress; // Added onLongPress
   final Color color;
 
   const _SquareButton({
     required this.icon,
     required this.label,
     required this.onPressed,
+    this.onLongPress,
     required this.color,
   });
 
   @override
   Widget build(BuildContext context) {
     final bool isEnabled = onPressed != null;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final Color backgroundColor = isEnabled 
+        ? (isDark ? const Color(0xFF1E1E1E) : Colors.white) 
+        : (isDark ? const Color(0xFF2C2C2C) : Colors.grey[100]!);
+    
+    final Color iconBgColor = isEnabled 
+        ? color.withOpacity(isDark ? 0.2 : 0.1) 
+        : (isDark ? Colors.grey[800]! : Colors.grey[200]!);
+
+    final Color textColor = isEnabled
+        ? (isDark ? Colors.white70 : Colors.black87)
+        : Colors.grey[400]!;
+
     return Material(
-      color: isEnabled ? Colors.white : Colors.grey[100],
+      color: backgroundColor,
       elevation: isEnabled ? 2 : 0,
       borderRadius: BorderRadius.circular(24),
       child: InkWell(
         onTap: onPressed,
+        onLongPress: onLongPress, // Hooked up
         borderRadius: BorderRadius.circular(24),
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: isEnabled ? color.withAlpha(26) : Colors.transparent, 
+              color: isEnabled 
+                  ? color.withOpacity(0.1) 
+                  : Colors.transparent, 
               width: 1
             ),
           ),
@@ -631,7 +826,7 @@ class _SquareButton extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: isEnabled ? color.withAlpha(26) : Colors.grey[200],
+                  color: iconBgColor,
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -647,7 +842,7 @@ class _SquareButton extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: isEnabled ? Colors.black87 : Colors.grey[400],
+                  color: textColor,
                 ),
               ),
             ],
@@ -660,15 +855,17 @@ class _SquareButton extends StatelessWidget {
 
 // --- 24-Hour Sleep Clock ---
 class SleepClock extends StatelessWidget {
-  final List<SleepEntry> sleepLog;
+  final DailyLog dailyLog; // Changed from List<SleepEntry>
   final bool isSleeping;
   final DateTime? bedTime;
+  final bool isDark;
 
   const SleepClock({
     super.key, 
-    required this.sleepLog, 
+    required this.dailyLog, 
     this.isSleeping = false,
-    this.bedTime
+    this.bedTime,
+    this.isDark = false,
   });
 
   @override
@@ -677,18 +874,19 @@ class SleepClock extends StatelessWidget {
       width: 220, 
       height: 220,
       child: CustomPaint(
-        painter: SleepClockPainter(sleepLog, isSleeping, bedTime),
+        painter: SleepClockPainter(dailyLog, isSleeping, bedTime, isDark),
       ),
     );
   }
 }
 
 class SleepClockPainter extends CustomPainter {
-  final List<SleepEntry> sleepLog;
+  final DailyLog dailyLog;
   final bool isSleeping;
   final DateTime? currentBedTime;
+  final bool isDark;
 
-  SleepClockPainter(this.sleepLog, this.isSleeping, this.currentBedTime);
+  SleepClockPainter(this.dailyLog, this.isSleeping, this.currentBedTime, this.isDark);
 
   // Helper to convert Hour (0-24) to Angle (radians)
   // With canvas rotated -90deg: 0h = 0 rad (Top), 6h = pi/2 (Right), 12h = pi (Bottom)
@@ -700,12 +898,10 @@ class SleepClockPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = min(size.width, size.height) / 2;
-    
-    // Styling constants
     final double tickLength = 6.0;
     final double numberRadius = radius - 20;
 
-    // ROTATE CANVAS: Make 0 radians point to Top (North)
+    // ROTATE CANVAS (-90 deg)
     canvas.save();
     canvas.translate(center.dx, center.dy);
     canvas.rotate(-pi / 2);
@@ -713,27 +909,25 @@ class SleepClockPainter extends CustomPainter {
 
     // 1. Draw Dial Background
     final bgPaint = Paint()
-      ..color = Colors.grey[100]!
+      ..color = isDark ? const Color(0xFF121212) : Colors.grey[100]!
       ..style = PaintingStyle.fill;
     canvas.drawCircle(center, radius, bgPaint);
     
     final borderPaint = Paint()
-      ..color = Colors.grey[300]!
+      ..color = isDark ? Colors.grey[800]! : Colors.grey[300]!
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5;
     canvas.drawCircle(center, radius, borderPaint);
 
-    // 2. Draw Numbers & Ticks
+    // 2. Draw Ticks & Numbers
     final textPainter = TextPainter(textDirection: ui.TextDirection.ltr);
     final tickPaint = Paint()
-      ..color = Colors.grey[400]!
+      ..color = isDark ? Colors.grey[700]! : Colors.grey[400]!
       ..strokeWidth = 1;
 
-    // We want numbers 0, 2, 4 ... 22
     for (int i = 0; i < 24; i++) {
       final angle = getAngle(i.toDouble());
       
-      // Draw Tick
       final tickStart = Offset(
         center.dx + (radius - tickLength) * cos(angle),
         center.dy + (radius - tickLength) * sin(angle),
@@ -743,20 +937,18 @@ class SleepClockPainter extends CustomPainter {
         center.dy + radius * sin(angle),
       );
       
-      // Thicker ticks for main hours (0, 6, 12, 18)
       if (i % 6 == 0) {
         tickPaint.strokeWidth = 2;
         tickPaint.color = Colors.indigo[200]!;
       } else {
         tickPaint.strokeWidth = 1;
-        tickPaint.color = Colors.grey[300]!;
+        tickPaint.color = isDark ? Colors.grey[700]! : Colors.grey[300]!;
       }
       canvas.drawLine(tickStart, tickEnd, tickPaint);
 
-      // Draw Number (Even only)
       if (i % 2 == 0) {
         final textStyle = TextStyle(
-          color: (i % 6 == 0) ? Colors.indigo : Colors.grey[600],
+          color: (i % 6 == 0) ? Colors.indigo : (isDark ? Colors.grey[500] : Colors.grey[600]),
           fontSize: (i % 6 == 0) ? 14 : 11,
           fontWeight: (i % 6 == 0) ? FontWeight.bold : FontWeight.normal,
         );
@@ -764,11 +956,9 @@ class SleepClockPainter extends CustomPainter {
         textPainter.text = TextSpan(text: i.toString(), style: textStyle);
         textPainter.layout();
         
-        // Calculate position in rotated system
         final textX = center.dx + numberRadius * cos(angle);
         final textY = center.dy + numberRadius * sin(angle);
 
-        // Draw Text: Temporarily rotate back 90deg so text appears upright
         canvas.save();
         canvas.translate(textX, textY);
         canvas.rotate(pi / 2); 
@@ -778,41 +968,29 @@ class SleepClockPainter extends CustomPainter {
       }
     }
 
-    // 3. Draw Completed Sleep Arcs
+    // 3. Draw Completed Sleep Arcs (SOLID COLOR for visibility)
     final sleepPaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.butt // butt ends for cleaner continuous segments if adjacent
-      ..strokeWidth = 12.0;
+      ..strokeCap = StrokeCap.butt 
+      ..strokeWidth = 12.0
+      ..color = Colors.indigo.withOpacity(isDark ? 0.6 : 0.5); // Solid color
 
-    for (var entry in sleepLog) {
+    for (var entry in dailyLog.sleepLog) {
       double startHour = entry.bedTime.hour + entry.bedTime.minute / 60.0;
       double durationHours = entry.durationHours; 
 
-      if (durationHours <= 0) continue; // Skip zero or negative durations
+      if (durationHours <= 0) continue;
       
       double startAngle = getAngle(startHour);
       double sweepAngle = durationHours * (pi / 12);
-
-      // Use a gradient shader for the arc
-      final Rect arcRect = Rect.fromCircle(center: center, radius: radius - 35);
       
-      // Gradient shader aligns naturally with the rotated canvas (0 is top)
-      sleepPaint.shader = SweepGradient(
-        startAngle: startAngle,
-        endAngle: startAngle + sweepAngle,
-        colors: [Colors.indigo[300]!, Colors.indigo[500]!],
-        transform: GradientRotation(startAngle),
-      ).createShader(arcRect);
-
+      final Rect arcRect = Rect.fromCircle(center: center, radius: radius - 35);
       canvas.drawArc(arcRect, startAngle, sweepAngle, false, sleepPaint);
     }
 
-    // 4. Draw Active Sleep Arc (if currently sleeping)
+    // 4. Draw Active Sleep Arc
     if (isSleeping && currentBedTime != null) {
-      // START FROM 0 (Top) as requested to show duration
-      // Instead of using bedTime hour, we start at angle 0.
-      double startAngle = getAngle(0);
-      
+      double startAngle = getAngle(0); // Top
       final now = DateTime.now();
       double durationMins = now.difference(currentBedTime!).inMinutes.toDouble();
 
@@ -830,7 +1008,33 @@ class SleepClockPainter extends CustomPainter {
       }
     }
 
-    // 5. Draw Current Time Indicator (REMOVED)
+    // 5. Draw Markers for Other Events (Meds, Caffeine, Exercise)
+    void drawMarker(DateTime time, Color color) {
+       double h = time.hour + time.minute / 60.0;
+       double angle = getAngle(h);
+       final pos = Offset(
+         center.dx + (radius - 35) * cos(angle), // Same radius as sleep track
+         center.dy + (radius - 35) * sin(angle)
+       );
+       
+       // Draw dot
+       canvas.drawCircle(pos, 5.0, Paint()..color = color);
+       // Optional: white border for contrast
+       canvas.drawCircle(pos, 5.0, Paint()..color = isDark ? Colors.black54 : Colors.white54..style = PaintingStyle.stroke..strokeWidth=1.5);
+    }
+
+    // Medication (Green)
+    for (var m in dailyLog.medicationLog) {
+       drawMarker(m.time, Colors.green);
+    }
+    // Caffeine/Substance (Brown)
+    for (var s in dailyLog.substanceLog) {
+       drawMarker(s.time, Colors.brown);
+    }
+    // Exercise (Orange)
+    for (var e in dailyLog.exerciseLog) {
+       drawMarker(e.startTime, Colors.orange);
+    }
 
     canvas.restore(); // Restore the main rotation
   }
