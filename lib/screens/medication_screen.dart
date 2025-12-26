@@ -260,8 +260,8 @@ class _MedicationScreenState extends State<MedicationScreen> {
                         }
 
                         final cat = _medicationTypes[index];
-                        // Show name + dosage hint if available
-                        final label = cat.name + (cat.defaultDosage != null ? ' (${cat.defaultDosage} mg)' : '');
+                        // // Show name + dosage hint if available
+                        // final label = cat.name + (cat.defaultDosage != null ? ' (${cat.defaultDosage} mg)' : '');
                         
                         return GestureDetector(
                           onLongPress: () {
@@ -269,7 +269,9 @@ class _MedicationScreenState extends State<MedicationScreen> {
                             _deleteMedicationType(cat);
                           },
                           child: _MedicationTile(
-                            label: label,
+                            name: cat.name,
+                            dosage: (cat.defaultDosage != null ? '${cat.defaultDosage} mg' : ''),
+                            // label: label,
                             icon: cat.icon,
                             color: cat.color,
                             onTap: () {
@@ -386,14 +388,18 @@ class _MedicationScreenState extends State<MedicationScreen> {
 }
 
 class _MedicationTile extends StatelessWidget {
-  final String label;
+  final String? name;
+  final String? dosage;
+  final String? label;
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
   final bool isOutline;
 
   const _MedicationTile({
-    required this.label,
+    this.name,
+    this.dosage,
+    this.label,
     required this.icon,
     required this.color,
     required this.onTap,
@@ -419,14 +425,38 @@ class _MedicationTile extends StatelessWidget {
               Icon(icon, color: color),
               const SizedBox(width: 8),
               Flexible(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    color: isOutline ? color : Theme.of(context).colorScheme.onSurface,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
+                child: name != null
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name!,
+                            style: TextStyle(
+                              color: isOutline ? color : Theme.of(context).colorScheme.onSurface,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (dosage != null)
+                            Text(
+                              dosage!,
+                              style: TextStyle(
+                                color: isOutline ? color : Theme.of(context).colorScheme.onSurface,
+                                fontWeight: FontWeight.normal,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                        ],
+                      )
+                    : Text(
+                        label!,
+                        style: TextStyle(
+                          color: isOutline ? color : Theme.of(context).colorScheme.onSurface,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
               ),
             ],
           ),
