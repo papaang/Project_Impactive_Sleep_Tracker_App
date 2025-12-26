@@ -422,7 +422,7 @@ class _MedicationTile extends StatelessWidget {
                 child: Text(
                   label,
                   style: TextStyle(
-                    color: isOutline ? color : Colors.black87,
+                    color: isOutline ? color : Theme.of(context).colorScheme.onSurface,
                     fontWeight: FontWeight.w600,
                   ),
                   overflow: TextOverflow.ellipsis,
