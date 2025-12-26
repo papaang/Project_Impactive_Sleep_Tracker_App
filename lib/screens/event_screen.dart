@@ -1,5 +1,5 @@
 import 'dart:math';
-import 'dart:ui' as ui; // Added import for ui.TextDirection and ui.PictureRecorder
+import 'dart:ui' as ui; // Added to resolve TextDirection and MaskFilter
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../log_service.dart';
@@ -8,6 +8,7 @@ import 'medication_screen.dart';
 import 'caffeine_alcohol_screen.dart';
 import 'exercise_screen.dart';
 import 'notes_screen.dart';
+import 'category_management_screen.dart'; // Added import
 
 class EventScreen extends StatefulWidget {
   final DateTime date;
@@ -50,77 +51,184 @@ class _EventScreenState extends State<EventScreen> {
     return DateFormat('HH:mm').format(dt);
   }
 
-  Future<DateTime?> _selectDateTime(DateTime? initialDate, {String? helpText}) async {
-    DateTime now = DateTime.now();
-    initialDate = initialDate ?? now;
-    final DateTime? date = await showDatePicker(
-      context: context,
-      initialDate: initialDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(now.year + 5),
-      helpText: helpText,
-    );
-    if (date == null) return null;
-    final TimeOfDay? time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(initialDate),
-      helpText: helpText
-    );
-    if (time == null) return null;
-    return DateTime(date.year, date.month, date.day, time.hour, time.minute);
-  }
-
   Future<void> _showDayTypeDialog() async {
+    const defaultIds = ['work', 'relax', 'travel', 'social'];
+
     final Category? selectedType = await showDialog<Category>(
       context: context,
       builder: (BuildContext context) {
-        return SimpleDialog(
-          title: const Text('Select Day Type'),
-          children: _dayTypes.map((type) {
-            return SimpleDialogOption(
-              onPressed: () => Navigator.pop(context, type),
-              child: Row(
-                children: [
-                  Icon(type.icon, color: type.color),
-                  const SizedBox(width: 16),
-                  Text(type.name),
-                ],
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return Dialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+              insetPadding: const EdgeInsets.all(16),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
+                      child: Text(
+                        'Select Day Type',
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Flexible(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: _dayTypes.length + 1,
+                        itemBuilder: (context, index) {
+                          if (index == _dayTypes.length) {
+                            return ListTile(
+                              leading: const Icon(Icons.add, color: Colors.grey),
+                              title: const Text('Other...'),
+                              onTap: () => Navigator.pop(context, Category(id: '__new__', name: 'Other', iconName: 'add', colorHex: '0xFF000000')),
+                            );
+                          }
+
+                          final type = _dayTypes[index];
+                          final isDefault = defaultIds.contains(type.id);
+
+                          return ListTile(
+                            leading: Icon(type.icon, color: type.color),
+                            title: Text(type.name),
+                            trailing: isDefault
+                                ? null
+                                : IconButton(
+                                    icon: const Icon(Icons.delete_outline, size: 20, color: Colors.grey),
+                                    onPressed: () async {
+                                      final confirm = await showDialog<bool>(
+                                        context: context,
+                                        builder: (ctx) => AlertDialog(
+                                          title: const Text("Delete Category"),
+                                          content: Text("Delete '${type.name}'? This cannot be undone."),
+                                          actions: [
+                                            TextButton.icon(
+                                              onPressed: () => Navigator.pop(ctx, false), 
+                                              icon: const Icon(Icons.close, size: 18),
+                                              label: const Text("Cancel")
+                                            ),
+                                            TextButton.icon(
+                                              onPressed: () => Navigator.pop(ctx, true), 
+                                              icon: const Icon(Icons.delete, size: 18, color: Colors.red),
+                                              label: const Text("Delete", style: TextStyle(color: Colors.red))
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                      
+                                      if (confirm == true) {
+                                        setState(() {
+                                          _dayTypes.removeAt(index);
+                                          if (_log.dayTypeId == type.id) {
+                                            _log.dayTypeId = null; 
+                                          }
+                                        });
+                                        setStateDialog(() {}); 
+                                        await CategoryManager().saveCategories('day_types', _dayTypes);
+                                        await _logService.saveDailyLog(widget.date, _log);
+                                      }
+                                    },
+                                  ),
+                            onTap: () => Navigator.pop(context, type),
+                          );
+                        },
+                      ),
+                    ),
+                    const Divider(),
+                    ListTile(
+                      leading: const Icon(Icons.settings, color: Colors.grey),
+                      title: const Text('Manage Categories'),
+                      onTap: () async {
+                        Navigator.pop(context); // Close the dialog
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const CategoryManagementScreen()),
+                        );
+                        // Reload day types after returning from category management
+                        final dayTypes = await CategoryManager().getCategories('day_types');
+                        setState(() {
+                          _dayTypes = dayTypes;
+                        });
+                        // Optional: Re-open the dialog to show changes
+                        if (mounted) _showDayTypeDialog();
+                      },
+                    ),
+                  ],
+                ),
               ),
             );
-          }).toList(),
+          },
         );
       },
     );
 
     if (selectedType != null) {
-      setState(() {
-        _log.dayTypeId = selectedType.id;
-      });
-      await _logService.saveDailyLog(widget.date, _log);
-    }
-  }
+      if (selectedType.id == '__new__') {
+        final TextEditingController textController = TextEditingController();
+        final String? newName = await showDialog<String>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('New Day Type'),
+            content: TextField(
+              controller: textController,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Category Name',
+                hintText: 'e.g. Study, Sick Day',
+              ),
+              textCapitalization: TextCapitalization.sentences,
+            ),
+            actions: [
+              TextButton.icon(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close, size: 18),
+                label: const Text('Cancel'),
+              ),
+              ElevatedButton.icon(
+                onPressed: () => Navigator.pop(context, textController.text),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Add'),
+              ),
+            ],
+          ),
+        );
 
-  Future<void> _resetDayType() async {
-    setState(() {
-      _log.dayTypeId = null;
-    });
-    await _logService.saveDailyLog(widget.date, _log);
+        if (newName != null && newName.trim().isNotEmpty) {
+          final String name = newName.trim();
+          final String id = name.toLowerCase().replaceAll(RegExp(r'\s+'), '_') + '_${DateTime.now().millisecondsSinceEpoch}';
+          
+          final newCategory = Category(
+            id: id,
+            name: name,
+            iconName: 'wb_sunny_outlined',
+            colorHex: '0xFF607D8B', 
+          );
 
-    // Show notification
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Day type reset'),
-          duration: Duration(seconds: 2),
-        ),
-      );
+          setState(() {
+            _dayTypes.add(newCategory);
+            _log.dayTypeId = newCategory.id;
+          });
+          
+          await CategoryManager().saveCategories('day_types', _dayTypes);
+          await _logService.saveDailyLog(widget.date, _log);
+        }
+      } else {
+        setState(() {
+          _log.dayTypeId = selectedType.id;
+        });
+        await _logService.saveDailyLog(widget.date, _log);
+      }
     }
   }
 
   Future<void> _editSleepEntry(int index, SleepEntry entry) async {
     await showDialog(
       context: context,
-      barrierDismissible: false, // Prevent closing by tapping outside during editing
+      barrierDismissible: false, 
       builder: (context) {
         return SleepSessionEditor(
           initialEntry: entry,
@@ -177,6 +285,12 @@ class _EventScreenState extends State<EventScreen> {
   @override
   Widget build(BuildContext context) {
     final String displayDate = DateFormat('dd/MM/yyyy').format(widget.date);
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    // Resolve Day Type for display
+    final Category? currentDayType = _dayTypes
+        .where((c) => c.id == _log.dayTypeId)
+        .firstOrNull;
 
     return Scaffold(
       appBar: AppBar(
@@ -251,15 +365,41 @@ class _EventScreenState extends State<EventScreen> {
                 Divider(),
                 const SizedBox(height: 24),
 
-                _EventButton(
-                  label: _dayTypes.where((c) => c.id == _log.dayTypeId).firstOrNull?.displayName ?? 'Type of Day',
-                  icon: _dayTypes.where((c) => c.id == _log.dayTypeId).firstOrNull?.icon ?? Icons.wb_sunny_outlined,
-                  color: _dayTypes.where((c) => c.id == _log.dayTypeId).firstOrNull?.color ?? Colors.indigo[800]!,
-                  backgroundColor: _dayTypes.where((c) => c.id == _log.dayTypeId).firstOrNull?.color.withOpacity(0.1),
-                  borderColor: _dayTypes.where((c) => c.id == _log.dayTypeId).firstOrNull?.color,
-                  onPressed: _showDayTypeDialog,
-                  onLongPress: _resetDayType,
+                // --- DAY TYPE SELECTOR (Styling matched to Home Screen) ---
+                InkWell(
+                  onTap: _showDayTypeDialog,
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                    decoration: BoxDecoration(
+                      color: currentDayType?.color.withOpacity(0.1) ?? (isDark ? Colors.grey[800] : Colors.grey[200]),
+                      border: Border.all(
+                        color: currentDayType?.color ?? (isDark ? Colors.grey[700]! : Colors.grey[400]!),
+                        width: 1.5,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          currentDayType?.icon ?? Icons.help_outline,
+                          color: currentDayType?.color ?? Colors.grey[600],
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          currentDayType?.displayName ?? "Set Type of Day",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: currentDayType?.color ?? (isDark ? Colors.grey[400] : Colors.grey[700]),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
+                
                 const SizedBox(height: 16),
                 _EventButton(
                   label: 'Medication',
@@ -333,115 +473,59 @@ class _EventButton extends StatelessWidget {
     required this.color,
     required this.onPressed,
     this.subtitle,
-    this.backgroundColor,
-    this.borderColor,
-    this.onLongPress,
   });
   final String label;
   final String? subtitle;
   final IconData icon;
   final Color color;
   final VoidCallback onPressed;
-  final Color? backgroundColor;
-  final Color? borderColor;
-  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
-    final bool useCustomStyle = backgroundColor != null && borderColor != null;
-
-    if (useCustomStyle) {
-      return Container(
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          border: Border.all(color: borderColor!, width: 1.5),
-          borderRadius: BorderRadius.circular(12.0),
-        ),
-        child: InkWell(
-          onTap: onPressed,
-          onLongPress: onLongPress,
-          borderRadius: BorderRadius.circular(12.0),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              children: [
-                Icon(icon, color: color, size: 28),
-                const SizedBox(width: 16),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+    return Card(
+      elevation: 1.0,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(12.0),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            children: [
+              Icon(icon, color: color, size: 28),
+              const SizedBox(width: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: color,
+                    ),
+                  ),
+                  if (subtitle != null)
                     Text(
-                      label,
+                      subtitle!,
                       style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: color,
+                        fontSize: 12,
+                        color: Colors.grey[600],
                       ),
                     ),
-                    if (subtitle != null)
-                      Text(
-                        subtitle!,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                  ],
-                ),
-                const Spacer(),
-                Icon(Icons.arrow_forward_ios, color: Colors.grey[400], size: 16),
-              ],
-            ),
+                ],
+              ),
+              const Spacer(),
+              Icon(Icons.arrow_forward_ios, color: Colors.grey[400], size: 16),
+            ],
           ),
         ),
-      );
-    } else {
-      return Card(
-        elevation: 1.0,
-        child: InkWell(
-          onTap: onPressed,
-          onLongPress: onLongPress,
-          borderRadius: BorderRadius.circular(12.0),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              children: [
-                Icon(icon, color: color, size: 28),
-                const SizedBox(width: 16),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: color,
-                      ),
-                    ),
-                    if (subtitle != null)
-                      Text(
-                        subtitle!,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                  ],
-                ),
-                const Spacer(),
-                Icon(Icons.arrow_forward_ios, color: Colors.grey[400], size: 16),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
+      ),
+    );
   }
 }
 
 // ---------------------------------------------------------------------------
-// --- NEW INTERACTIVE VISUAL SLEEP EDITOR ---
+// --- SLEEP SESSION EDITOR (2 STEPS) ---
 // ---------------------------------------------------------------------------
 
 class SleepSessionEditor extends StatefulWidget {
@@ -653,7 +737,6 @@ class _SleepSessionEditorState extends State<SleepSessionEditor> {
       return Offset(center.dx + r * cos(angle), center.dy + r * sin(angle));
     }
     
-    // Check linear distance to confirm intent (prevent accidental drags from center)
     double targetR = (_draggingHandle == _SleepHandle.bed || _draggingHandle == _SleepHandle.out) 
         ? outerRingR : innerRingR;
     DateTime targetTime;
@@ -692,7 +775,7 @@ class _SleepSessionEditorState extends State<SleepSessionEditor> {
     
     return Dialog(
       backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-      insetPadding: EdgeInsets.all(16),
+      insetPadding: const EdgeInsets.all(16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: Container(
         width: double.maxFinite,
@@ -704,7 +787,7 @@ class _SleepSessionEditorState extends State<SleepSessionEditor> {
     );
   }
 
-  // --- STEP 1: TIMES (No Scrolling needed for main clock interaction) ---
+  // --- STEP 1: TIMES (No Scrolling) ---
   Widget _buildTimeStep(bool isDark) {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -770,7 +853,7 @@ class _SleepSessionEditorState extends State<SleepSessionEditor> {
             ElevatedButton.icon(
               icon: Icon(Icons.arrow_forward),
               onPressed: () {
-                // Basic validation before next
+                // Basic validation
                 if (_asleepTime.isBefore(_bedTime)) {
                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Asleep time cannot be before Bed time")));
                    return;
@@ -787,103 +870,105 @@ class _SleepSessionEditorState extends State<SleepSessionEditor> {
 
   // --- STEP 2: DETAILS ---
   Widget _buildDetailsStep(bool isDark) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          "Session Details (2/2)",
-          style: TextStyle(
-            fontSize: 20, 
-            fontWeight: FontWeight.bold, 
-            color: isDark ? Colors.white70 : Colors.blueGrey[800]
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            "Session Details (2/2)",
+            style: TextStyle(
+              fontSize: 20, 
+              fontWeight: FontWeight.bold, 
+              color: isDark ? Colors.white70 : Colors.blueGrey[800]
+            ),
           ),
-        ),
-        const SizedBox(height: 32),
+          const SizedBox(height: 32),
 
-        if (_sleepLocations.isNotEmpty)
-          DropdownButtonFormField<String>(
-            value: _locationId,
-            dropdownColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
-            decoration: const InputDecoration(
-              labelText: "Sleep Location",
-              border: OutlineInputBorder(),
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              prefixIcon: Icon(Icons.place_outlined),
-            ),
-            items: _sleepLocations.map((cat) {
-              return DropdownMenuItem(
-                value: cat.id,
-                child: Text(cat.name),
-              );
-            }).toList(),
-            onChanged: (val) {
-              if (val != null) setState(() => _locationId = val);
-            },
-          ),
-        
-        const SizedBox(height: 24),
-
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _awakeningsCtrl,
-                decoration: InputDecoration(
-                  labelText: "Awakenings", 
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                  prefixIcon: Icon(Icons.restart_alt),
-                ),
-                keyboardType: TextInputType.number,
+          if (_sleepLocations.isNotEmpty)
+            DropdownButtonFormField<String>(
+              value: _locationId,
+              dropdownColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+              decoration: const InputDecoration(
+                labelText: "Sleep Location",
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                prefixIcon: Icon(Icons.place_outlined),
               ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: TextField(
-                controller: _awakeMinsCtrl,
-                decoration: InputDecoration(
-                  labelText: "Awake Mins", 
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                  suffixText: "min",
-                  prefixIcon: Icon(Icons.timer_outlined),
-                ),
-                keyboardType: TextInputType.number,
-              ),
-            ),
-          ],
-        ),
-        
-        const SizedBox(height: 32),
-
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            TextButton.icon(
-              icon: Icon(Icons.arrow_back, size: 18),
-              onPressed: () => setState(() => _currentStep = 1), 
-              label: Text("Back", style: TextStyle(color: Colors.grey))
-            ),
-            ElevatedButton.icon(
-              icon: Icon(Icons.check),
-              onPressed: () {
-                final updatedEntry = SleepEntry(
-                  bedTime: _bedTime,
-                  fellAsleepTime: _asleepTime,
-                  wakeTime: _wakeTime,
-                  outOfBedTime: _outTime,
-                  awakeningsCount: int.tryParse(_awakeningsCtrl.text) ?? 0,
-                  awakeDurationMinutes: int.tryParse(_awakeMinsCtrl.text) ?? 0,
-                  sleepLocationId: _locationId
+              items: _sleepLocations.map((cat) {
+                return DropdownMenuItem(
+                  value: cat.id,
+                  child: Text(cat.name),
                 );
-                widget.onSave(updatedEntry);
-                Navigator.pop(context);
-              }, 
-              label: Text("Save Session")
+              }).toList(),
+              onChanged: (val) {
+                if (val != null) setState(() => _locationId = val);
+              },
             ),
-          ],
-        )
-      ],
+          
+          const SizedBox(height: 24),
+
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _awakeningsCtrl,
+                  decoration: InputDecoration(
+                    labelText: "Awakenings", 
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    prefixIcon: Icon(Icons.restart_alt),
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextField(
+                  controller: _awakeMinsCtrl,
+                  decoration: InputDecoration(
+                    labelText: "Awake Mins", 
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    suffixText: "min",
+                    prefixIcon: Icon(Icons.timer_outlined),
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 32),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              TextButton.icon(
+                icon: Icon(Icons.arrow_back, size: 18),
+                onPressed: () => setState(() => _currentStep = 1), 
+                label: Text("Back", style: TextStyle(color: Colors.grey))
+              ),
+              ElevatedButton.icon(
+                icon: Icon(Icons.check),
+                onPressed: () {
+                  final updatedEntry = SleepEntry(
+                    bedTime: _bedTime,
+                    fellAsleepTime: _asleepTime,
+                    wakeTime: _wakeTime,
+                    outOfBedTime: _outTime,
+                    awakeningsCount: int.tryParse(_awakeningsCtrl.text) ?? 0,
+                    awakeDurationMinutes: int.tryParse(_awakeMinsCtrl.text) ?? 0,
+                    sleepLocationId: _locationId
+                  );
+                  widget.onSave(updatedEntry);
+                  Navigator.pop(context);
+                }, 
+                label: Text("Save Session")
+              ),
+            ],
+          )
+        ],
+      ),
     );
   }
 }
