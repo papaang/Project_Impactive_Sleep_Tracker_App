@@ -195,11 +195,21 @@ class _CaffeineAlcoholScreenState extends State<CaffeineAlcoholScreen> {
                         child: ListTile(
                           leading: Icon(category?.icon ?? Icons.local_drink,
                               color: category?.color ?? Colors.brown),
-                          // Display if amount>1, display 'x cups', elif amount<1 display 'cup', elif int parsing error display 'cup'
-                          title: Text("$displayName: ${item.amount} cup${(int.tryParse(item.amount)!= null ? int.tryParse(item.amount)! : 0) > 1 ? 's' : ''}",
-                              style: TextStyle(fontWeight: FontWeight.bold)),
+                          // Display amount in red if non-numeric, else in theme color; 
+                          // Use suffix ' cup(s)' for non-numeric, ' cup' for <=1, or ' cups' for >1
+                          title: 
+                            RichText(
+                              text: TextSpan(
+                                style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).textTheme.bodyMedium?.color ?? Colors.black), 
+                                children: [
+                                  TextSpan(text: "$displayName: "), 
+                                  TextSpan(text: item.amount, style: int.tryParse(item.amount) == null ? TextStyle(color: Colors.red) : null), 
+                                  TextSpan(text: int.tryParse(item.amount) != null ? (int.tryParse(item.amount)! > 1 ? " cups" : " cup") : " cup(s)")
+                                ]
+                              )
+                            ),
                           subtitle:
-                              Text(DateFormat('h:mm a').format(item.time)),
+                            Text(DateFormat('h:mm a').format(item.time)),
                           trailing: IconButton(
                             icon: Icon(Icons.delete_outline, color: Colors.red),
                             onPressed: () => _deleteEntry(idx),
