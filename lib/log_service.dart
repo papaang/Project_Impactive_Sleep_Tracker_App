@@ -20,10 +20,18 @@ class LogService {
     _prefs = await SharedPreferences.getInstance();
   }
 
+  // --- THEME PERSISTENCE ---
   bool get isDarkMode => _prefs.getBool('is_dark_mode') ?? false;
 
   Future<void> setDarkMode(bool value) async {
     await _prefs.setBool('is_dark_mode', value);
+  }
+
+  // --- NOTIFICATION PERSISTENCE ---
+  bool get areNotificationsEnabled => _prefs.getBool('notifications_enabled') ?? true;
+
+  Future<void> setNotificationsEnabled(bool value) async {
+    await _prefs.setBool('notifications_enabled', value);
   }
 
   String _getKeyForDate(DateTime date) {
@@ -276,9 +284,9 @@ class LogService {
         allowedExtensions: ['csv'],
       );
 
-      if (result != null) {
+      if (result != null && result.files.single.path != null) {
         File file = File(result.files.single.path!);
-        final input = file.readAsStringSync();
+        final input = await file.readAsString();
         final List<List<dynamic>> rows = const CsvToListConverter().convert(input, eol: '\n');
 
         if (rows.isEmpty) throw Exception("Empty file");
@@ -326,11 +334,12 @@ class LogService {
       var row = rows[i];
       if (row.length < 5) continue;
       try {
-        DateTime date = DateTime.parse(row[0].toString());
+        DateTime date = DateTime.parse(row[0].toString().trim());
         DateTime utcDate = DateTime.utc(date.year, date.month, date.day);
         DailyLog log = await getDailyLog(utcDate);
         
         DateTime parseT(String t) {
+             t = t.trim();
              if (t.isEmpty) return date; 
              final p = t.split(':');
              return DateTime(date.year, date.month, date.day, int.parse(p[0]), int.parse(p[1]));
@@ -339,7 +348,7 @@ class LogService {
         DateTime bed = parseT(row[1].toString());
         DateTime asleep = parseT(row[2].toString());
         DateTime wake = parseT(row[3].toString());
-        DateTime? out = row[4].toString().isNotEmpty ? parseT(row[4].toString()) : null;
+        DateTime? out = row[4].toString().trim().isNotEmpty ? parseT(row[4].toString()) : null;
 
         // Fix rollovers for display times
         if (asleep.isBefore(bed)) asleep = asleep.add(const Duration(days: 1));
@@ -351,8 +360,7 @@ class LogService {
           fellAsleepTime: asleep,
           wakeTime: wake,
           outOfBedTime: out,
-          sleepLocationId: row.length > 5 ? row[5].toString() : 'bed',
-          // sleepLatencyMinutes is a getter, derived from bedTime and fellAsleepTime
+          sleepLocationId: row.length > 5 ? row[5].toString().trim() : 'bed',
           awakeningsCount: row.length > 7 ? (row[7] as num).toInt() : 0,
           awakeDurationMinutes: row.length > 8 ? (row[8] as num).toInt() : 0,
         );
@@ -379,14 +387,14 @@ class LogService {
     for (int i = 1; i < rows.length; i++) {
       var row = rows[i];
       try {
-        DateTime date = DateTime.parse(row[0].toString());
+        DateTime date = DateTime.parse(row[0].toString().trim());
         DateTime utcDate = DateTime.utc(date.year, date.month, date.day);
         
-        final parts = row[3].toString().split(':');
+        final parts = row[3].toString().trim().split(':');
         DateTime time = DateTime(date.year, date.month, date.day, int.parse(parts[0]), int.parse(parts[1]));
         
-        String medType = row[1].toString();
-        String dosage = row[2].toString();
+        String medType = row[1].toString().trim();
+        String dosage = row[2].toString().trim();
 
         DailyLog log = await getDailyLog(utcDate);
         
@@ -416,14 +424,14 @@ class LogService {
     for (int i = 1; i < rows.length; i++) {
       var row = rows[i];
       try {
-        DateTime date = DateTime.parse(row[0].toString());
+        DateTime date = DateTime.parse(row[0].toString().trim());
         DateTime utcDate = DateTime.utc(date.year, date.month, date.day);
         
-        final parts = row[3].toString().split(':');
+        final parts = row[3].toString().trim().split(':');
         DateTime time = DateTime(date.year, date.month, date.day, int.parse(parts[0]), int.parse(parts[1]));
         
-        String subType = row[1].toString();
-        String amount = row[2].toString();
+        String subType = row[1].toString().trim();
+        String amount = row[2].toString().trim();
 
         DailyLog log = await getDailyLog(utcDate);
         
@@ -452,16 +460,16 @@ class LogService {
     for (int i = 1; i < rows.length; i++) {
       var row = rows[i];
       try {
-        DateTime date = DateTime.parse(row[0].toString());
+        DateTime date = DateTime.parse(row[0].toString().trim());
         DateTime utcDate = DateTime.utc(date.year, date.month, date.day);
         
-        final startP = row[2].toString().split(':');
-        final endP = row[3].toString().split(':');
+        final startP = row[2].toString().trim().split(':');
+        final endP = row[3].toString().trim().split(':');
         DateTime start = DateTime(date.year, date.month, date.day, int.parse(startP[0]), int.parse(startP[1]));
         DateTime end = DateTime(date.year, date.month, date.day, int.parse(endP[0]), int.parse(endP[1]));
         if (end.isBefore(start)) end = end.add(const Duration(days: 1));
 
-        String exType = row[1].toString();
+        String exType = row[1].toString().trim();
 
         DailyLog log = await getDailyLog(utcDate);
 

@@ -1,10 +1,40 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart'; 
 import '../log_service.dart';
-import '../app.dart'; // To access themeNotifier
+import '../app.dart'; 
 import 'category_management_screen.dart';
+import '../notification_service.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  final LogService _logService = LogService();
+  bool _isNotifEnabled = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _isNotifEnabled = _logService.areNotificationsEnabled;
+  }
+
+  Future<void> _launchGitHub() async {
+    final Uri url = Uri.parse('https://github.com/papaang/Project_Impactive_Sleep_Tracker_App');
+    try {
+      if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+        if (mounted) {
+           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not launch URL')));
+        }
+      }
+    } catch (e) {
+      // In case package is missing or platform error
+      // debugPrint('Could not launch URL: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -13,7 +43,7 @@ class SettingsScreen extends StatelessWidget {
         title: const Text('Settings'),
         centerTitle: true,
       ),
-      body: Center(
+      body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(20.0),
           child: Column(
@@ -30,7 +60,17 @@ class SettingsScreen extends StatelessWidget {
                     ?.copyWith(fontWeight: FontWeight.w600),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 8),
+              // --- VERSION TAG ---
+              Container(
+                alignment: Alignment.center,
+                child: Chip(
+                  label: const Text("Version 2.0"),
+                  backgroundColor: Colors.indigo.withOpacity(0.1),
+                  labelStyle: TextStyle(color: Colors.indigo[800], fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(height: 20),
 
               // --- DARK MODE TOGGLE ---
               ValueListenableBuilder<ThemeMode>(
@@ -51,16 +91,30 @@ class SettingsScreen extends StatelessWidget {
                   );
                 },
               ),
-              const SizedBox(height: 20),
 
-              const Text(
-                'All your log data is saved locally on this device. Clearing data is permanent and cannot be undone.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: Colors.grey),
+              // --- NOTIFICATION TOGGLE ---
+              Card(
+                child: SwitchListTile(
+                  title: const Text("Notification Controls"),
+                  subtitle: const Text("Show Add Meds/Sleep in notification bar"),
+                  secondary: const Icon(Icons.notifications_active_outlined),
+                  value: _isNotifEnabled,
+                  activeColor: Colors.indigoAccent,
+                  onChanged: (val) async {
+                    setState(() => _isNotifEnabled = val);
+                    await _logService.setNotificationsEnabled(val);
+                    if (val) {
+                      NotificationService().showPersistentControls(isSleeping: false);
+                    } else {
+                      NotificationService().cancelAll();
+                    }
+                  },
+                ),
               ),
+
               const SizedBox(height: 20),
               
-              // --- CATEGORIES MANAGEMENT BUTTON ---
+              // --- CATEGORIES MANAGEMENT ---
               ElevatedButton.icon(
                 icon: const Icon(Icons.category_outlined),
                 label: const Text('Manage Categories'),
@@ -71,9 +125,9 @@ class SettingsScreen extends StatelessWidget {
                   );
                 },
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
 
-              // --- CSV EXPORT BUTTON (Reverted) ---
+              // --- CSV EXPORT ---
               ElevatedButton.icon(
                 icon: const Icon(Icons.download),
                 label: const Text('Export Data as CSV'),
@@ -81,9 +135,9 @@ class SettingsScreen extends StatelessWidget {
                   await LogService().exportToCsv(context);
                 },
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
 
-              // --- CSV IMPORT BUTTON ---
+              // --- CSV IMPORT ---
               OutlinedButton.icon(
                 icon: const Icon(Icons.upload_file),
                 label: const Text('Import Data from CSV'),
@@ -91,8 +145,18 @@ class SettingsScreen extends StatelessWidget {
                    await LogService().importFromCsv(context);
                 },
               ),
+              const SizedBox(height: 12),
+
+              // --- GITHUB LINK ---
+              OutlinedButton.icon(
+                icon: const Icon(Icons.code),
+                label: const Text('Visit GitHub Repo'),
+                onPressed: _launchGitHub,
+              ),
+
               const SizedBox(height: 20),
               
+              // --- CLEAR DATA ---
               OutlinedButton.icon(
                 icon: const Icon(Icons.delete_forever_outlined),
                 label: const Text('Clear All Saved Data'),
@@ -132,7 +196,8 @@ class SettingsScreen extends StatelessWidget {
                     }
                   }
                 },
-              )
+              ),
+              const SizedBox(height: 30),
             ],
           ),
         ),
