@@ -18,6 +18,37 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
   // final List<String> _categoryTypeName = ['Day Type', 'Sleep Location', 'Medication Type', 'Exercise Type'];
   // final List<String> _categoryTypeNames = ['Day Types', 'Sleep Locations', 'Medication Types', 'Exercise Types'];
 
+  static const Map<String, String> iconDisplayNames = {
+    'work_outline': 'Work',
+    'self_improvement_outlined': 'Self Improvement',
+    'explore_outlined': 'Explore',
+    'people_outline': 'People',
+    'bed': 'Bed',
+    'weekend': 'Weekend',
+    'directions_car': 'Car',
+    'medication': 'Medication',
+    'directions_walk': 'Walk',
+    'directions_run': 'Run',
+    'fitness_center': 'Fitness',
+    'coffee': 'Coffee',
+    'emoji_food_beverage': 'Food & Beverage',
+    'local_drink': 'Drink',
+    'wine_bar': 'Wine',
+  };
+
+  static const Map<String, String> colorDisplayNames = {
+    '0xFF1565C0': 'Blue',
+    '0xFF2E7D32': 'Green',
+    '0xFFEF6C00': 'Orange',
+    '0xFF7B1FA2': 'Purple',
+    '0xFF424242': 'Grey',
+    '0xFF4CAF50': 'Light Green',
+    '0xFFFF9800': 'Light Orange',
+    '0xFFF44336': 'Red',
+    '0xFF795548': 'Brown',
+    '0xFF9C27B0': 'Pink',
+  };
+
   @override
   void initState() {
     super.initState();
@@ -85,7 +116,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
                     children: [
                       Icon(Category(id: 'dummy', iconName: icon, name: '', colorHex: '0xFF000000').icon),
                       const SizedBox(width: 8),
-                      Text(icon),
+                      Text(iconDisplayNames[icon] ?? icon),
                     ],
                   ),
                 )).toList(),
@@ -116,7 +147,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
                         color: Color(int.parse(color)),
                       ),
                       const SizedBox(width: 8),
-                      Text(color),
+                      Text(colorDisplayNames[color] ?? color),
                     ],
                   ),
                 )).toList(),
