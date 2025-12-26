@@ -6,12 +6,8 @@ import 'package:csv/csv.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
-import 'package:archive/archive.dart';
+import 'package:file_picker/file_picker.dart';
 import 'models.dart';
-
-// -------------------------------------------------------------------
-// --- 2. LogService (Data Persistence & Export) ---
-// -------------------------------------------------------------------
 
 class LogService {
   static final LogService _instance = LogService._internal();
@@ -23,6 +19,7 @@ class LogService {
   Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
   }
+
   bool get isDarkMode => _prefs.getBool('is_dark_mode') ?? false;
 
   Future<void> setDarkMode(bool value) async {
@@ -40,7 +37,6 @@ class LogService {
       try {
         return DailyLog.fromJson(jsonDecode(logJson));
       } catch (e) {
-        // print("Error parsing log for $date: $e");
         return DailyLog();
       }
     } else {
@@ -66,15 +62,13 @@ class LogService {
         final log = await getDailyLog(utcDate);
         allLogs[utcDate] = log;
       } catch (e) {
-        // print("Error parsing log for key $key: $e");
+        // ignore error
       }
     }
     return allLogs;
   }
 
   Future<void> clearAllData() async {
-    // Fix: Only remove log entries (keys starting with 'log_')
-    // This preserves categories (day_types, etc.) so the app doesn't break.
     final keys = _prefs.getKeys();
     for (final key in keys) {
       if (key.startsWith('log_')) {
@@ -82,14 +76,21 @@ class LogService {
       }
     }
   }
-  
-  // Export to CSV function 
+
+  // ---------------------------------------------------------------------------
+  // --- EXPORT TO CSV (Multiple Files) ---
+  // ---------------------------------------------------------------------------
+
   Future<void> exportToCsv(BuildContext context) async {
     try {
       final Map<DateTime, DailyLog> allLogs = await getAllLogs();
-      // Note that use of temp directory does not work for web apps
       final directory = await getTemporaryDirectory();
       final exportDir = Directory("${directory.path}/sleep_data_export");
+      
+      // Clean up previous exports
+      if (await exportDir.exists()) {
+        await exportDir.delete(recursive: true);
+      }
       await exportDir.create(recursive: true);
 
       final categoryLogsDir = Directory("${exportDir.path}/category_logs");
@@ -98,25 +99,16 @@ class LogService {
       final userCategoriesDir = Directory("${exportDir.path}/user_categories");
       await userCategoriesDir.create();
 
-      // Main daily log CSV
-      List<List<dynamic>> mainRows = [];
-      mainRows.add([
-        "Date",
-        "Day Type",
-        "Total Sleep (Hours)",
-        "Sleep Latency (Mins)",
-        "Awakenings (Count)",
-        "Awake Duration (Mins)",
-        "Out Of Bed Time",
-        "Sleep Sessions Total",
-        "Notes",
-        "Caffeine Total (Cups)",
-        "Meds Log Total (Entries)",
-        "Exercise Total (Mins)"
-      ]);
-
       final sortedKeys = allLogs.keys.toList()..sort();
       final dayTypes = await CategoryManager().getCategories('day_types');
+
+      // 1. Main Daily Log
+      List<List<dynamic>> mainRows = [];
+      mainRows.add([
+        "Date", "Day Type", "Total Sleep (Hrs)", "Sleep Latency (Mins)", 
+        "Awakenings (Count)", "Awake Duration (Mins)", "Out Of Bed Time", 
+        "Sleep Sessions Detail", "Notes", "Substance Log", "Medication Log", "Exercise Log"
+      ]);
 
       for (var date in sortedKeys) {
         final log = allLogs[date]!;
@@ -127,49 +119,42 @@ class LogService {
         int totalAwakeDur = 0;
         String lastOutTime = "";
 
-        int sleepSessionsTotal = log.sleepLog.length;
-
-        for (var i = 0; i < log.sleepLog.length; i++) {
-          var e = log.sleepLog[i];
+        String sleepStr = log.sleepLog.map((e) {
           totalLatency += e.sleepLatencyMinutes;
           totalAwakenings += e.awakeningsCount;
           totalAwakeDur += e.awakeDurationMinutes;
           if (e.outOfBedTime != null) {
-            lastOutTime = DateFormat('HH:mm').format(e.outOfBedTime!);
+             lastOutTime = DateFormat('HH:mm').format(e.outOfBedTime!);
           }
-        }
+          return "${DateFormat('HH:mm').format(e.bedTime)}-${DateFormat('HH:mm').format(e.wakeTime)}";
+        }).join(" | ");
 
-        int averageLatency = totalLatency ~/ (sleepSessionsTotal==0 ? 1 : sleepSessionsTotal);
-
-        int caffeineTotal = log.substanceLog.where((e) => e.substanceTypeId == 'coffee').fold(0, (sum, e) => sum + (int.tryParse(e.amount) ?? 0));
-
-        int medsLogTotal = log.medicationLog.length;
-
-        int exerciseTotalMins = log.exerciseLog.fold(0, (sum, e) => sum + e.finishTime.difference(e.startTime).inMinutes);
+        String substanceStr = log.substanceLog.map((e) => "${e.name} ${e.amount}").join(" | ");
+        String medsStr = log.medicationLog.map((e) => "${e.medicationTypeId} ${e.dosage}").join(" | ");
+        String exerciseStr = log.exerciseLog.map((e) => e.type).join(" | ");
 
         mainRows.add([
           DateFormat('yyyy-MM-dd').format(date),
           category?.displayName ?? "",
           log.totalSleepHours.toStringAsFixed(2),
-          averageLatency,
+          totalLatency,
           totalAwakenings,
           totalAwakeDur,
           lastOutTime,
-          sleepSessionsTotal,
+          sleepStr,
           log.notes ?? "",
-          caffeineTotal,
-          medsLogTotal,
-          exerciseTotalMins
+          substanceStr,
+          medsStr,
+          exerciseStr
         ]);
       }
 
       String mainCsvData = const ListToCsvConverter().convert(mainRows);
-      final mainFile = File("${exportDir.path}/main_daily_log.csv");
-      await mainFile.writeAsString(mainCsvData);
+      await File("${exportDir.path}/main_daily_log.csv").writeAsString(mainCsvData);
 
-      // Sleep log CSV
+      // 2. Sleep Log
       List<List<dynamic>> sleepRows = [];
-      sleepRows.add(["Date", "Bed Time", "Fell Asleep Time", "Wake Time", "Out Of Bed Time", "Duration Hours", "Sleep Latency Mins", "Awakenings Count", "Awake Duration Mins", "Sleep Location"]);
+      sleepRows.add(["Date", "Bed Time", "Fell Asleep Time", "Wake Time", "Out Of Bed Time", "Sleep Location", "Sleep Latency Mins", "Awakenings Count", "Awake Duration Mins"]);
       for (var date in sortedKeys) {
         final log = allLogs[date]!;
         for (var entry in log.sleepLog) {
@@ -179,19 +164,17 @@ class LogService {
             DateFormat('HH:mm').format(entry.fellAsleepTime),
             DateFormat('HH:mm').format(entry.wakeTime),
             entry.outOfBedTime != null ? DateFormat('HH:mm').format(entry.outOfBedTime!) : "",
-            entry.durationHours.toStringAsFixed(2),
+            entry.sleepLocationId ?? 'bed',
             entry.sleepLatencyMinutes,
             entry.awakeningsCount,
             entry.awakeDurationMinutes,
-            entry.sleepLocationDisplayName
           ]);
         }
       }
       String sleepCsvData = const ListToCsvConverter().convert(sleepRows);
-      final sleepFile = File("${categoryLogsDir.path}/sleep_log.csv");
-      await sleepFile.writeAsString(sleepCsvData);
+      await File("${categoryLogsDir.path}/sleep_log.csv").writeAsString(sleepCsvData);
 
-      // Substance log CSV
+      // 3. Substance Log
       List<List<dynamic>> substanceRows = [];
       substanceRows.add(["Date", "Substance Type", "Amount", "Time"]);
       for (var date in sortedKeys) {
@@ -206,10 +189,9 @@ class LogService {
         }
       }
       String substanceCsvData = const ListToCsvConverter().convert(substanceRows);
-      final substanceFile = File("${categoryLogsDir.path}/substance_log.csv");
-      await substanceFile.writeAsString(substanceCsvData);
+      await File("${categoryLogsDir.path}/substance_log.csv").writeAsString(substanceCsvData);
 
-      // Medication log CSV
+      // 4. Medication Log
       List<List<dynamic>> medicationRows = [];
       medicationRows.add(["Date", "Medication Type", "Dosage", "Time"]);
       for (var date in sortedKeys) {
@@ -224,10 +206,9 @@ class LogService {
         }
       }
       String medicationCsvData = const ListToCsvConverter().convert(medicationRows);
-      final medicationFile = File("${categoryLogsDir.path}/medication_log.csv");
-      await medicationFile.writeAsString(medicationCsvData);
+      await File("${categoryLogsDir.path}/medication_log.csv").writeAsString(medicationCsvData);
 
-      // Exercise log CSV
+      // 5. Exercise Log
       List<List<dynamic>> exerciseRows = [];
       exerciseRows.add(["Date", "Exercise Type", "Start Time", "Finish Time", "Duration Mins"]);
       for (var date in sortedKeys) {
@@ -235,7 +216,7 @@ class LogService {
         for (var entry in log.exerciseLog) {
           exerciseRows.add([
             DateFormat('yyyy-MM-dd').format(date),
-            entry.type,
+            entry.exerciseTypeId,
             DateFormat('HH:mm').format(entry.startTime),
             DateFormat('HH:mm').format(entry.finishTime),
             entry.finishTime.difference(entry.startTime).inMinutes
@@ -243,139 +224,264 @@ class LogService {
         }
       }
       String exerciseCsvData = const ListToCsvConverter().convert(exerciseRows);
-      final exerciseFile = File("${categoryLogsDir.path}/exercise_log.csv");
-      await exerciseFile.writeAsString(exerciseCsvData);
+      await File("${categoryLogsDir.path}/exercise_log.csv").writeAsString(exerciseCsvData);
 
-      // User categories CSVs
+      // 6. User Categories
       final categoryTypes = ['day_types', 'sleep_locations', 'medication_types', 'exercise_types', 'substance_types'];
       for (var type in categoryTypes) {
         final categories = await CategoryManager().getCategories(type);
         List<List<dynamic>> catRows = [];
-        catRows.add(["id", "name", "iconName", "colorHex"]);
+        catRows.add(["id", "name", "iconName", "colorHex", "defaultDosage"]);
         for (var cat in categories) {
-          catRows.add([cat.id, cat.name, cat.iconName, cat.colorHex]);
+          catRows.add([cat.id, cat.name, cat.iconName, cat.colorHex, cat.defaultDosage?.toString() ?? ""]);
         }
         String catCsvData = const ListToCsvConverter().convert(catRows);
-        final catFile = File("${userCategoriesDir.path}/$type.csv");
-        await catFile.writeAsString(catCsvData);
+        await File("${userCategoriesDir.path}/$type.csv").writeAsString(catCsvData);
       }
 
-      // README.md
+      // 7. README
       const readmeContent = '''
 # Sleep Data Export
-
-This export contains your sleep tracking data in a structured folder format.
-
-## Files
-
-- `main_daily_log.csv`: Summary statistics for each day, including total sleep, average latency, awakenings, and summary logs.
-- `category_logs/`: Detailed logs for each category.
-  - `sleep_log.csv`: Individual sleep sessions with times and metrics.
-  - `substance_log.csv`: Caffeine and alcohol consumption entries.
-  - `medication_log.csv`: Medication intake entries.
-  - `exercise_log.csv`: Exercise session entries.
-- `user_categories/`: Definitions of user-defined categories.
-  - `day_types.csv`: Day type categories.
-  - `sleep_locations.csv`: Sleep location categories.
-  - `medication_types.csv`: Medication type categories.
-  - `exercise_types.csv`: Exercise type categories.
-  - `substance_types.csv`: Substance type categories.
-
-## Column Descriptions
-
-### main_daily_log.csv
-- **Date**: The date of the log entry in YYYY-MM-DD format.
-- **Day Type**: The type of day (e.g., Work, Relax, Travel, Social), based on user-selected category.
-- **Total Sleep (Hours)**: Total hours of sleep for the day, calculated as the sum of all sleep session durations.
-- **Sleep Latency (Mins)**: Average time in minutes taken to fall asleep across all sleep sessions (truncated to integer).
-- **Awakenings (Count)**: Total number of awakenings during sleep across all sessions (self-reported).
-- **Awake Duration (Mins)**: Overall duration of awakenings during sleep periods across all sessions (self-reported).
-- **Out Of Bed Time**: The time the user got out of bed for the last sleep session, in HH:mm format (empty if not recorded).
-- **Sleep Sessions Total**: The number of sleep sessions logged for the day.
-- **Notes**: Any additional notes entered by the user for the day.
-- **Caffeine Total (Cups)**: Total number of cups of coffee (or other caffeine/alcohol) consumed.
-- **Meds Log Total (Entries)**: Total number of medication entries for the day.
-- **Exercise Total (Mins)**: Total minutes spent exercising for the day.
-
-### sleep_log.csv
-- **Date**: The date of the sleep session in YYYY-MM-DD format.
-- **Bed Time**: The time the user went to bed, in HH:mm format.
-- **Fell Asleep Time**: The time the user fell asleep, in HH:mm format.
-- **Wake Time**: The time the user woke up, in HH:mm format.
-- **Out Of Bed Time**: The time the user got out of bed (i.e. Rise Time), in HH:mm format (empty if not recorded).
-- **Duration Hours**: The duration of the sleep session in hours (calculated from fell asleep to wake time).
-- **Sleep Latency Mins**: Time in minutes taken to fall asleep (bed time to fell asleep time).
-- **Awakenings Count**: Number of times the user woke up during this session (self-reported).
-- **Awake Duration Mins**: Overall duration of awakenings during this sleep session (self-reported).
-- **Sleep Location**: The location where the user slept (e.g., Bed, Couch, In Transit).
-
-### substance_log.csv
-- **Date**: The date of the substance entry in YYYY-MM-DD format.
-- **Substance Type**: The type of substance (e.g., coffee, tea, cola, alcohol).
-- **Amount**: The amount consumed (number of cups).
-- **Time**: The time the substance was consumed, in HH:mm format.
-
-### medication_log.csv
-- **Date**: The date of the medication entry in YYYY-MM-DD format.
-- **Medication Type**: The type of medication taken (e.g., Melatonin).
-- **Dosage**: The dosage amount (mg).
-- **Time**: The time the medication was taken, in HH:mm format.
-
-### exercise_log.csv
-- **Date**: The date of the exercise session in YYYY-MM-DD format.
-- **Exercise Type**: The type of exercise (e.g., Light, Medium, Heavy).
-- **Start Time**: The start time of the exercise session, in HH:mm format.
-- **Finish Time**: The finish time of the exercise session, in HH:mm format.
-- **Duration Mins**: The duration of the exercise session in minutes.
-
-## Notes
-
-- All times are in 24-hour format (HH:mm).
-- Dates are in YYYY-MM-DD format. Please use dates to link files for database analysis.
-- Durations are in hours or minutes as specified.
-- Empty fields indicate no data or N/A.
-- exercise_types and substance_types are not editable in this version of the app.
+- main_daily_log.csv: Summary.
+- category_logs/: Detailed entries.
+- user_categories/: Category definitions.
 ''';
-      final readmeFile = File("${exportDir.path}/README.md");
-      await readmeFile.writeAsString(readmeContent);
+      await File("${exportDir.path}/README.md").writeAsString(readmeContent);
 
-      // Create zip archive
-      final archive = Archive();
-
-      // Add all files to the archive
+      // 8. Share
+      final files = <XFile>[];
       await for (var entity in exportDir.list(recursive: true)) {
-        if (entity is File) {
-          final fileName = entity.path.replaceFirst('${exportDir.path}/', '');
-          final fileBytes = await entity.readAsBytes();
-          final archiveFile = ArchiveFile(fileName, fileBytes.length, fileBytes);
-          archive.addFile(archiveFile);
-        }
+        if (entity is File) files.add(XFile(entity.path));
       }
 
-      // Encode the archive as a zip
-      final zipEncoder = ZipEncoder();
-      final zipData = zipEncoder.encode(archive);
-
-      // Save the zip file
-      final zipFileName = 'sleep_data_export_${DateFormat('yyyy-MM-dd_HH-mm-ss').format(DateTime.now())}.zip';
-      final zipFile = File("${directory.path}/$zipFileName");
-      await zipFile.writeAsBytes(zipData);
-      print('Zip file created: ${zipFile.path}');
-
-      // Share the zip file
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(zipFile.path)], 
-          text: 'Here is your sleep data export as a zip file.'
-          )
-        );
+      await Share.shareXFiles(files, text: 'Your Sleep Tracker Data (CSV format)');
 
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error exporting CSV: $e. Note that use of temp directory does not work on web app.')),
+          SnackBar(content: Text('Error exporting CSV: $e')),
         );
       }
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // --- IMPORT FROM CSV ---
+  // ---------------------------------------------------------------------------
+
+  Future<void> importFromCsv(BuildContext context) async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['csv'],
+      );
+
+      if (result != null) {
+        File file = File(result.files.single.path!);
+        final input = file.readAsStringSync();
+        final List<List<dynamic>> rows = const CsvToListConverter().convert(input, eol: '\n');
+
+        if (rows.isEmpty) throw Exception("Empty file");
+
+        final headers = rows.first.map((e) => e.toString().trim()).toList();
+        int importCount = 0;
+
+        // Determine File Type
+        if (headers.contains('Bed Time') && headers.contains('Fell Asleep Time')) {
+          importCount = await _importSleepLog(rows);
+        } else if (headers.contains('Medication Type') && headers.contains('Dosage')) {
+          importCount = await _importMedicationLog(rows);
+        } else if (headers.contains('Substance Type') && headers.contains('Amount')) {
+          importCount = await _importSubstanceLog(rows);
+        } else if (headers.contains('Exercise Type') && headers.contains('Duration Mins')) {
+          importCount = await _importExerciseLog(rows);
+        } else {
+          throw Exception("Unknown CSV format. Use specific logs like sleep_log.csv.");
+        }
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Imported $importCount new entries.')),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Import Failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  // --- Helper: Same Minute Check for Deduplication ---
+  bool _isSameMinute(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day &&
+           a.hour == b.hour && a.minute == b.minute;
+  }
+
+  Future<int> _importSleepLog(List<List<dynamic>> rows) async {
+    int count = 0;
+    for (int i = 1; i < rows.length; i++) {
+      var row = rows[i];
+      if (row.length < 5) continue;
+      try {
+        DateTime date = DateTime.parse(row[0].toString());
+        DateTime utcDate = DateTime.utc(date.year, date.month, date.day);
+        DailyLog log = await getDailyLog(utcDate);
+        
+        DateTime parseT(String t) {
+             if (t.isEmpty) return date; 
+             final p = t.split(':');
+             return DateTime(date.year, date.month, date.day, int.parse(p[0]), int.parse(p[1]));
+        }
+
+        DateTime bed = parseT(row[1].toString());
+        DateTime asleep = parseT(row[2].toString());
+        DateTime wake = parseT(row[3].toString());
+        DateTime? out = row[4].toString().isNotEmpty ? parseT(row[4].toString()) : null;
+
+        // Fix rollovers for display times
+        if (asleep.isBefore(bed)) asleep = asleep.add(const Duration(days: 1));
+        if (wake.isBefore(asleep)) wake = wake.add(const Duration(days: 1));
+        if (out != null && out.isBefore(wake)) out = out.add(const Duration(days: 1));
+
+        SleepEntry newEntry = SleepEntry(
+          bedTime: bed,
+          fellAsleepTime: asleep,
+          wakeTime: wake,
+          outOfBedTime: out,
+          sleepLocationId: row.length > 5 ? row[5].toString() : 'bed',
+          // sleepLatencyMinutes is a getter, derived from bedTime and fellAsleepTime
+          awakeningsCount: row.length > 7 ? (row[7] as num).toInt() : 0,
+          awakeDurationMinutes: row.length > 8 ? (row[8] as num).toInt() : 0,
+        );
+
+        // Check for duplicates (same bed/wake/asleep time down to the minute)
+        bool exists = log.sleepLog.any((e) =>
+          _isSameMinute(e.bedTime, newEntry.bedTime) &&
+          _isSameMinute(e.wakeTime, newEntry.wakeTime) &&
+          _isSameMinute(e.fellAsleepTime, newEntry.fellAsleepTime)
+        );
+
+        if (!exists) {
+          log.sleepLog.add(newEntry);
+          await saveDailyLog(utcDate, log);
+          count++;
+        }
+      } catch (_) {}
+    }
+    return count;
+  }
+
+  Future<int> _importMedicationLog(List<List<dynamic>> rows) async {
+    int count = 0;
+    for (int i = 1; i < rows.length; i++) {
+      var row = rows[i];
+      try {
+        DateTime date = DateTime.parse(row[0].toString());
+        DateTime utcDate = DateTime.utc(date.year, date.month, date.day);
+        
+        final parts = row[3].toString().split(':');
+        DateTime time = DateTime(date.year, date.month, date.day, int.parse(parts[0]), int.parse(parts[1]));
+        
+        String medType = row[1].toString();
+        String dosage = row[2].toString();
+
+        DailyLog log = await getDailyLog(utcDate);
+        
+        // Deduplicate
+        bool exists = log.medicationLog.any((e) => 
+           e.medicationTypeId == medType && 
+           e.dosage == dosage && 
+           _isSameMinute(e.time, time)
+        );
+
+        if (!exists) {
+          log.medicationLog.add(MedicationEntry(
+            medicationTypeId: medType, 
+            dosage: dosage, 
+            time: time
+          ));
+          await saveDailyLog(utcDate, log);
+          count++;
+        }
+      } catch (_) {}
+    }
+    return count;
+  }
+
+  Future<int> _importSubstanceLog(List<List<dynamic>> rows) async {
+    int count = 0;
+    for (int i = 1; i < rows.length; i++) {
+      var row = rows[i];
+      try {
+        DateTime date = DateTime.parse(row[0].toString());
+        DateTime utcDate = DateTime.utc(date.year, date.month, date.day);
+        
+        final parts = row[3].toString().split(':');
+        DateTime time = DateTime(date.year, date.month, date.day, int.parse(parts[0]), int.parse(parts[1]));
+        
+        String subType = row[1].toString();
+        String amount = row[2].toString();
+
+        DailyLog log = await getDailyLog(utcDate);
+        
+        bool exists = log.substanceLog.any((e) => 
+           e.substanceTypeId == subType && 
+           e.amount == amount && 
+           _isSameMinute(e.time, time)
+        );
+
+        if (!exists) {
+          log.substanceLog.add(SubstanceEntry(
+            substanceTypeId: subType, 
+            amount: amount, 
+            time: time
+          ));
+          await saveDailyLog(utcDate, log);
+          count++;
+        }
+      } catch (_) {}
+    }
+    return count;
+  }
+
+  Future<int> _importExerciseLog(List<List<dynamic>> rows) async {
+    int count = 0;
+    for (int i = 1; i < rows.length; i++) {
+      var row = rows[i];
+      try {
+        DateTime date = DateTime.parse(row[0].toString());
+        DateTime utcDate = DateTime.utc(date.year, date.month, date.day);
+        
+        final startP = row[2].toString().split(':');
+        final endP = row[3].toString().split(':');
+        DateTime start = DateTime(date.year, date.month, date.day, int.parse(startP[0]), int.parse(startP[1]));
+        DateTime end = DateTime(date.year, date.month, date.day, int.parse(endP[0]), int.parse(endP[1]));
+        if (end.isBefore(start)) end = end.add(const Duration(days: 1));
+
+        String exType = row[1].toString();
+
+        DailyLog log = await getDailyLog(utcDate);
+
+        bool exists = log.exerciseLog.any((e) => 
+           e.exerciseTypeId == exType && 
+           _isSameMinute(e.startTime, start) &&
+           _isSameMinute(e.finishTime, end)
+        );
+
+        if (!exists) {
+          log.exerciseLog.add(ExerciseEntry(
+            exerciseTypeId: exType, 
+            startTime: start, 
+            finishTime: end
+          ));
+          await saveDailyLog(utcDate, log);
+          count++;
+        }
+      } catch (_) {}
+    }
+    return count;
   }
 }
