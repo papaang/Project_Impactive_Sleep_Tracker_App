@@ -215,11 +215,66 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
     }
   }
 
+  Future<void> _resetCategories() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Reset Categories'),
+        content: Text('Are you sure you want to reset all categories to their default values? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Reset'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      // Define default categories
+      final defaultDayTypes = [
+        Category(id: 'work', name: 'Work', iconName: 'work_outline', colorHex: '0xFF1565C0'),
+        Category(id: 'relax', name: 'Relax', iconName: 'self_improvement_outlined', colorHex: '0xFF2E7D32'),
+        Category(id: 'travel', name: 'Travel', iconName: 'explore_outlined', colorHex: '0xFFEF6C00'),
+        Category(id: 'social', name: 'Social', iconName: 'people_outline', colorHex: '0xFF7B1FA2'),
+      ];
+      final defaultSleepLocations = [
+        Category(id: 'bed', name: 'Bed', iconName: 'bed', colorHex: '0xFF1565C0'),
+        Category(id: 'couch', name: 'Couch', iconName: 'weekend', colorHex: '0xFF2E7D32'),
+        Category(id: 'in_transit', name: 'In Transit', iconName: 'directions_car', colorHex: '0xFFEF6C00'),
+      ];
+      final defaultMedicationTypes = [
+        Category(id: 'melatonin', name: 'Melatonin', iconName: 'medication', colorHex: '0xFF2E7D32', defaultDosage: 50),
+        Category(id: 'daridorexant', name: 'Daridorexant', iconName: 'medication', colorHex: '0xFF1565C0', defaultDosage: 50),
+        Category(id: 'sertraline', name: 'Sertraline', iconName: 'medication', colorHex: '0xFF7B1FA2', defaultDosage: 50),
+        Category(id: 'lisdexamfetamine', name: 'Lisdexamfetamine', iconName: 'medication', colorHex: '0xFFEF6C00', defaultDosage: 50),
+      ];
+
+      // Save default categories
+      await CategoryManager().saveCategories('day_types', defaultDayTypes);
+      await CategoryManager().saveCategories('sleep_locations', defaultSleepLocations);
+      await CategoryManager().saveCategories('medication_types', defaultMedicationTypes);
+
+      // Reload categories
+      await _loadCategories();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text('Manage Categories'),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.replay),
+            onPressed: _resetCategories,
+            tooltip: 'Reset Categories',
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           tabs: _categoryTypeNames.map((name) => Tab(text: name)).toList(),
