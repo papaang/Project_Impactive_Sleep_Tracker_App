@@ -362,7 +362,7 @@ class _MedicationScreenState extends State<MedicationScreen> {
                               child: Icon(category?.icon ?? Icons.medication_outlined, color: category?.color ?? Colors.green[800]),
                             ),
                             title: Text(displayName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                            subtitle: Text("Dosage: ${item.dosage} \nTime: ${DateFormat('HH:mm').format(item.time)}"),
+                            subtitle: Text("Dosage: ${item.dosage} mg \nTime: ${DateFormat('h:mm a').format(item.time)}"),
                             isThreeLine: true,
                             trailing: IconButton(
                               icon: const Icon(Icons.delete_outline, color: Colors.red),
