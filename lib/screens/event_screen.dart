@@ -1,5 +1,5 @@
 import 'dart:math';
-import 'dart:ui' as ui;
+import 'dart:ui' as ui; // Added to resolve TextDirection and MaskFilter
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../log_service.dart';
@@ -8,7 +8,7 @@ import 'medication_screen.dart';
 import 'caffeine_alcohol_screen.dart';
 import 'exercise_screen.dart';
 import 'notes_screen.dart';
-import 'category_management_screen.dart'; 
+import 'category_management_screen.dart'; // Added import
 
 class EventScreen extends StatefulWidget {
   final DateTime date;
