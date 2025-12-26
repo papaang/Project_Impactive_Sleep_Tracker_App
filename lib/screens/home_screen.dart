@@ -402,6 +402,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _resetDayType() async {
+    setState(() {
+      _todayLog.dayTypeId = null;
+    });
+    await _logService.saveDailyLog(_loadedDate, _todayLog);
+
+    // Show notification
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Day type reset'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool isAsleep = _todayLog.isSleeping;
@@ -586,6 +603,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     // --- DAY TYPE SELECTOR ---
                     InkWell(
                       onTap: _showDayTypeDialog,
+                      onLongPress: _resetDayType,
                       borderRadius: BorderRadius.circular(16),
                       child: Container(
                         padding: EdgeInsets.symmetric(vertical: 16, horizontal: 20),

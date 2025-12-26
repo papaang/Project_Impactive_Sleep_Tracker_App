@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../log_service.dart';
+import '../app.dart'; // To access themeNotifier
 import 'category_management_screen.dart';
-import '../app.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -29,7 +29,8 @@ class SettingsScreen extends StatelessWidget {
                     .headlineSmall
                     ?.copyWith(fontWeight: FontWeight.w600),
                 textAlign: TextAlign.center,
-              ),const SizedBox(height: 30),
+              ),
+              const SizedBox(height: 30),
 
               // --- DARK MODE TOGGLE ---
               ValueListenableBuilder<ThemeMode>(
@@ -51,15 +52,17 @@ class SettingsScreen extends StatelessWidget {
                 },
               ),
               const SizedBox(height: 20),
+
               const Text(
                 'All your log data is saved locally on this device. Clearing data is permanent and cannot be undone.',
                 textAlign: TextAlign.center,
-                 style: TextStyle(fontSize: 14, color: Colors.grey),
+                style: TextStyle(fontSize: 14, color: Colors.grey),
               ),
               const SizedBox(height: 20),
+              
               // --- CATEGORIES MANAGEMENT BUTTON ---
               ElevatedButton.icon(
-                 icon: const Icon(Icons.category_outlined),
+                icon: const Icon(Icons.category_outlined),
                 label: const Text('Manage Categories'),
                 onPressed: () {
                   Navigator.push(
@@ -70,12 +73,22 @@ class SettingsScreen extends StatelessWidget {
               ),
               const SizedBox(height: 20),
 
-              // --- CSV EXPORT BUTTON ---
+              // --- CSV EXPORT BUTTON (Reverted) ---
               ElevatedButton.icon(
                 icon: const Icon(Icons.download),
                 label: const Text('Export Data as CSV'),
                 onPressed: () async {
                   await LogService().exportToCsv(context);
+                },
+              ),
+              const SizedBox(height: 10),
+
+              // --- CSV IMPORT BUTTON ---
+              OutlinedButton.icon(
+                icon: const Icon(Icons.upload_file),
+                label: const Text('Import Data from CSV'),
+                onPressed: () async {
+                   await LogService().importFromCsv(context);
                 },
               ),
               const SizedBox(height: 20),
