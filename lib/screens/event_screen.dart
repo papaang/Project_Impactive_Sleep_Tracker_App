@@ -238,6 +238,8 @@ class _EventScreenState extends State<EventScreen> {
                   label: _dayTypes.where((c) => c.id == _log.dayTypeId).firstOrNull?.displayName ?? 'Type of Day',
                   icon: _dayTypes.where((c) => c.id == _log.dayTypeId).firstOrNull?.icon ?? Icons.wb_sunny_outlined,
                   color: _dayTypes.where((c) => c.id == _log.dayTypeId).firstOrNull?.color ?? Colors.indigo[800]!,
+                  backgroundColor: _dayTypes.where((c) => c.id == _log.dayTypeId).firstOrNull?.color.withOpacity(0.1),
+                  borderColor: _dayTypes.where((c) => c.id == _log.dayTypeId).firstOrNull?.color,
                   onPressed: _showDayTypeDialog,
                 ),
                 const SizedBox(height: 16),
@@ -313,54 +315,106 @@ class _EventButton extends StatelessWidget {
     required this.color,
     required this.onPressed,
     this.subtitle,
+    this.backgroundColor,
+    this.borderColor,
   });
   final String label;
   final String? subtitle;
   final IconData icon;
   final Color color;
   final VoidCallback onPressed;
+  final Color? backgroundColor;
+  final Color? borderColor;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 1.0,
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(12.0),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            children: [
-              Icon(icon, color: color, size: 28),
-              const SizedBox(width: 16),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: color,
-                    ),
-                  ),
-                  if (subtitle != null)
+    final bool useCustomStyle = backgroundColor != null && borderColor != null;
+
+    if (useCustomStyle) {
+      return Container(
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          border: Border.all(color: borderColor!, width: 1.5),
+          borderRadius: BorderRadius.circular(12.0),
+        ),
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(12.0),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              children: [
+                Icon(icon, color: color, size: 28),
+                const SizedBox(width: 16),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      subtitle!,
+                      label,
                       style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: color,
                       ),
                     ),
-                ],
-              ),
-              const Spacer(),
-              Icon(Icons.arrow_forward_ios, color: Colors.grey[400], size: 16),
-            ],
+                    if (subtitle != null)
+                      Text(
+                        subtitle!,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                  ],
+                ),
+                const Spacer(),
+                Icon(Icons.arrow_forward_ios, color: Colors.grey[400], size: 16),
+              ],
+            ),
           ),
         ),
-      ),
-    );
+      );
+    } else {
+      return Card(
+        elevation: 1.0,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(12.0),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              children: [
+                Icon(icon, color: color, size: 28),
+                const SizedBox(width: 16),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: color,
+                      ),
+                    ),
+                    if (subtitle != null)
+                      Text(
+                        subtitle!,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                  ],
+                ),
+                const Spacer(),
+                Icon(Icons.arrow_forward_ios, color: Colors.grey[400], size: 16),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
   }
 }
 
