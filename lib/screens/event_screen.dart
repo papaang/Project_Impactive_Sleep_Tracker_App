@@ -100,6 +100,23 @@ class _EventScreenState extends State<EventScreen> {
     }
   }
 
+  Future<void> _resetDayType() async {
+    setState(() {
+      _log.dayTypeId = null;
+    });
+    await _logService.saveDailyLog(widget.date, _log);
+
+    // Show notification
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Day type reset'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   Future<void> _editSleepEntry(int index, SleepEntry entry) async {
     await showDialog(
       context: context,
@@ -241,6 +258,7 @@ class _EventScreenState extends State<EventScreen> {
                   backgroundColor: _dayTypes.where((c) => c.id == _log.dayTypeId).firstOrNull?.color.withOpacity(0.1),
                   borderColor: _dayTypes.where((c) => c.id == _log.dayTypeId).firstOrNull?.color,
                   onPressed: _showDayTypeDialog,
+                  onLongPress: _resetDayType,
                 ),
                 const SizedBox(height: 16),
                 _EventButton(
@@ -317,6 +335,7 @@ class _EventButton extends StatelessWidget {
     this.subtitle,
     this.backgroundColor,
     this.borderColor,
+    this.onLongPress,
   });
   final String label;
   final String? subtitle;
@@ -325,6 +344,7 @@ class _EventButton extends StatelessWidget {
   final VoidCallback onPressed;
   final Color? backgroundColor;
   final Color? borderColor;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -339,6 +359,7 @@ class _EventButton extends StatelessWidget {
         ),
         child: InkWell(
           onTap: onPressed,
+          onLongPress: onLongPress,
           borderRadius: BorderRadius.circular(12.0),
           child: Padding(
             padding: const EdgeInsets.all(16.0),
@@ -379,6 +400,7 @@ class _EventButton extends StatelessWidget {
         elevation: 1.0,
         child: InkWell(
           onTap: onPressed,
+          onLongPress: onLongPress,
           borderRadius: BorderRadius.circular(12.0),
           child: Padding(
             padding: const EdgeInsets.all(16.0),
