@@ -1,17 +1,17 @@
-import 'dart:math'; // Required for the clock calculations
-import 'dart:ui' as ui; // Added back to resolve TextDirection
+import 'dart:math'; 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart'; // Required for response type
+import 'package:flutter_local_notifications/flutter_local_notifications.dart'; 
 import '../log_service.dart';
-import '../notification_service.dart'; // Import the new service
+import '../notification_service.dart'; 
 import '../models.dart';
 import 'event_screen.dart';
 import 'stats_screen.dart';
 import 'calendar_screen.dart';
 import 'settings_screen.dart';
-import 'category_management_screen.dart'; // Import for Manage Categories
+import 'category_management_screen.dart';
+import 'dart:ui' as ui; 
 
 // Specific Activity Screens
 import 'medication_screen.dart';
@@ -152,7 +152,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _addOneCaffeine() async {
-    int cups = 1; // Default to 1 cup
+    int cups = 1; 
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
@@ -173,7 +173,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     
     await _logService.saveDailyLog(_loadedDate, _todayLog);
 
-    // Show brief notification
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -317,57 +316,118 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _showDayTypeDialog() async {
+    const defaultIds = ['work', 'relax', 'travel', 'social'];
+
     final Category? selectedType = await showDialog<Category>(
       context: context,
       builder: (BuildContext context) {
-        return SimpleDialog(
-          title: const Text('Select Day Type'),
-          children: [
-            ..._dayTypes.map((type) {
-              return SimpleDialogOption(
-                onPressed: () => Navigator.pop(context, type),
-                child: Row(
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return Dialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+              insetPadding: const EdgeInsets.all(16),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(type.icon, color: type.color),
-                    const SizedBox(width: 16),
-                    Text(type.name),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
+                      child: Text(
+                        'Select Day Type',
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Flexible(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: _dayTypes.length + 1,
+                        itemBuilder: (context, index) {
+                          if (index == _dayTypes.length) {
+                            return ListTile(
+                              leading: const Icon(Icons.add, color: Colors.grey),
+                              title: const Text('Other...'),
+                              onTap: () => Navigator.pop(context, Category(id: '__new__', name: 'Other', iconName: 'add', colorHex: '0xFF000000')),
+                            );
+                          }
+
+                          final type = _dayTypes[index];
+                          final isDefault = defaultIds.contains(type.id);
+
+                          return ListTile(
+                            leading: Icon(type.icon, color: type.color),
+                            title: Text(type.name),
+                            trailing: isDefault
+                                ? null
+                                : IconButton(
+                                    icon: const Icon(Icons.delete_outline, size: 20, color: Colors.grey),
+                                    onPressed: () async {
+                                      final confirm = await showDialog<bool>(
+                                        context: context,
+                                        builder: (ctx) => AlertDialog(
+                                          title: const Text("Delete Category"),
+                                          content: Text("Delete '${type.name}'? This cannot be undone."),
+                                          actions: [
+                                            TextButton.icon(
+                                              onPressed: () => Navigator.pop(ctx, false), 
+                                              icon: const Icon(Icons.close, size: 18),
+                                              label: const Text("Cancel")
+                                            ),
+                                            TextButton.icon(
+                                              onPressed: () => Navigator.pop(ctx, true), 
+                                              icon: const Icon(Icons.delete, size: 18, color: Colors.red),
+                                              label: const Text("Delete", style: TextStyle(color: Colors.red))
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                      
+                                      if (confirm == true) {
+                                        setState(() {
+                                          _dayTypes.removeAt(index);
+                                          if (_todayLog.dayTypeId == type.id) {
+                                            _todayLog.dayTypeId = null; 
+                                          }
+                                        });
+                                        setStateDialog(() {}); 
+                                        await CategoryManager().saveCategories('day_types', _dayTypes);
+                                      }
+                                    },
+                                  ),
+                            onTap: () => Navigator.pop(context, type),
+                          );
+                        },
+                      ),
+                    ),
+                    const Divider(),
+                    SimpleDialogOption(
+                      onPressed: () async {
+                        Navigator.pop(context); // Close the dialog
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const CategoryManagementScreen()),
+                        );
+                        // Reload day types after returning from category management
+                        final dayTypes = await CategoryManager().getCategories('day_types');
+                        setState(() {
+                          _dayTypes = dayTypes;
+                        });
+                      },
+                      child: Row(
+                        children: const [
+                          Icon(Icons.settings, color: Colors.grey),
+                          SizedBox(width: 16),
+                          Text('Manage Categories'),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
-              );
-            }),
-            SimpleDialogOption(
-              onPressed: () => Navigator.pop(context, Category(id: '__new__', name: 'Other', iconName: 'add', colorHex: '0xFF000000')),
-              child: Row(
-                children: const [
-                  Icon(Icons.add, color: Colors.grey),
-                  SizedBox(width: 16),
-                  Text('Other...'),
-                ],
               ),
-            ),
-            const Divider(),
-            SimpleDialogOption(
-              onPressed: () async {
-                Navigator.pop(context); // Close the dialog
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const CategoryManagementScreen()),
-                );
-                // Reload day types after returning from category management
-                final dayTypes = await CategoryManager().getCategories('day_types');
-                setState(() {
-                  _dayTypes = dayTypes;
-                });
-              },
-              child: Row(
-                children: const [
-                  Icon(Icons.settings, color: Colors.grey),
-                  SizedBox(width: 16),
-                  Text('Manage Categories'),
-                ],
-              ),
-            ),
-          ],
+            );
+          },
         );
       },
     );
@@ -495,38 +555,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               onTap: () => Navigator.pop(context),
             ),
             ListTile(
-              leading: Icon(Icons.add_task_outlined),
-              title: Text('Today\'s Events'),
+              leading: Icon(Icons.calendar_today),
+              title: Text('Today\'s Timeline'),
               onTap: () {
                 Navigator.pop(context);
                 final now = DateTime.now();
                 final today = DateTime(now.year, now.month, now.day);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => EventScreen(date: today),
-                  ),
-                ).then((_) => _loadTodayLog());
+                Navigator.push(context, MaterialPageRoute(builder: (_) => EventScreen(date: today))).then((_) => _loadTodayLog());
               },
             ),
             ListTile(
-              leading: Icon(Icons.leaderboard_outlined),
-              title: Text('Statistics'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const StatsScreen()));
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.calendar_month_outlined),
-              title: Text('Past Entries Calendar'),
+              leading: Icon(Icons.history),
+              title: Text('History Calendar'),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(context, MaterialPageRoute(builder: (_) => const CalendarScreen()));
               },
             ),
             ListTile(
-              leading: Icon(Icons.settings_outlined),
+              leading: Icon(Icons.settings),
               title: Text('Settings'),
               onTap: () {
                 Navigator.pop(context);
@@ -576,11 +623,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             // --- Sleep Clock Visualization ---
                             if (showClock) ...[
                               const SizedBox(height: 24),
-                              SleepClock(
-                                dailyLog: _todayLog, // Pass the whole log
-                                isSleeping: isAsleep,
-                                bedTime: _todayLog.currentBedTime,
-                                isDark: isDark,
+                              GestureDetector( // Added GestureDetector for interactivity
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => EventScreen(date: _loadedDate),
+                                    ),
+                                  ).then((_) => _loadTodayLog());
+                                },
+                                child: SleepClock(
+                                  dailyLog: _todayLog, 
+                                  isSleeping: isAsleep,
+                                  bedTime: _todayLog.currentBedTime,
+                                  isDark: isDark,
+                                ),
                               ),
                             ],
                           ],
@@ -668,9 +725,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     Divider(height: 1, color: isDark ? Colors.grey[800] : Colors.black12),
                     const SizedBox(height: 32),
                     
-                    // --- ACTIVITIES GRID ---
+                    // --- SECTION 1: LOGGING ACTIVITIES ---
                     Text(
-                      "Activities & Logs", 
+                      "Log Activities", 
                       style: TextStyle(
                         color: isDark ? Colors.grey[400] : Colors.grey[600], 
                         fontWeight: FontWeight.bold,
@@ -686,7 +743,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       physics: const NeverScrollableScrollPhysics(),
                       mainAxisSpacing: 16,
                       crossAxisSpacing: 16,
-                      childAspectRatio: 1.0,
+                      childAspectRatio: 1.0, 
                       children: [
                         _SquareButton(
                           icon: Icons.medication_outlined,
@@ -699,30 +756,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             ).then((_) => _loadTodayLog());
                           },
                         ),
-                        // --- UPDATED: Quick Add Caffeine Button ---
                         _SquareButton(
                           icon: Icons.coffee,
                           label: "+1 Caffeine",
                           color: Colors.brown,
-                          onPressed: _addOneCaffeine, // Quick Add
-                          onLongPress: () { // Full Screen on Long Press
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => CaffeineAlcoholScreen(date: _loadedDate)),
-                            ).then((_) => _loadTodayLog());
+                          onPressed: _addOneCaffeine, 
+                          onLongPress: () { 
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => CaffeineAlcoholScreen(date: _loadedDate))).then((_) => _loadTodayLog());
                           },
                         ),
-                        // --- NEW: Quick Add Alcohol Button ---
                         _SquareButton(
                           icon: Icons.wine_bar, 
                           label: "+1 Alcohol",
                           color: Colors.purple,
                           onPressed: _addOneAlcohol,
                           onLongPress: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => CaffeineAlcoholScreen(date: _loadedDate)),
-                            ).then((_) => _loadTodayLog());
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => CaffeineAlcoholScreen(date: _loadedDate))).then((_) => _loadTodayLog());
                           },
                         ),
                         _SquareButton(
@@ -747,10 +796,36 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             ).then((_) => _loadTodayLog());
                           },
                         ),
-                        // --- STATS & GRAPHS ---
+                      ],
+                    ),
+
+                    const SizedBox(height: 32),
+                    Divider(height: 1, color: isDark ? Colors.grey[800] : Colors.black12),
+                    const SizedBox(height: 32),
+
+                    // --- SECTION 2: INSIGHTS & TRENDS ---
+                    Text(
+                      "Insights & Trends", 
+                      style: TextStyle(
+                        color: isDark ? Colors.grey[400] : Colors.grey[600], 
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        letterSpacing: 1.0,
+                      )
+                    ),
+                    const SizedBox(height: 16),
+
+                    GridView.count(
+                      crossAxisCount: 2,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      mainAxisSpacing: 16,
+                      crossAxisSpacing: 16,
+                      childAspectRatio: 1.0,
+                      children: [
                         _SquareButton(
                           icon: Icons.bar_chart,
-                          label: "Statistics",
+                          label: "General Stats",
                           color: Colors.purple,
                           onPressed: () {
                             Navigator.push(context, MaterialPageRoute(builder: (_) => const StatsScreen()));
@@ -758,7 +833,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         ),
                         _SquareButton(
                           icon: Icons.ssid_chart,
-                          label: "Sleep Graph",
+                          label: "Daily Timeline",
                           color: Colors.indigoAccent,
                           onPressed: () {
                             Navigator.push(context, MaterialPageRoute(builder: (_) => const SleepGraphScreen()));
@@ -766,7 +841,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         ),
                         _SquareButton(
                           icon: Icons.grid_on,
-                          label: "Heatmap",
+                          label: "Consistency\nHeatmap",
                           color: Colors.deepPurpleAccent,
                           onPressed: () {
                             Navigator.push(context, MaterialPageRoute(builder: (_) => const SleepHeatmapScreen()));
@@ -782,7 +857,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         ),
                         _SquareButton(
                           icon: Icons.scatter_plot, 
-                          label: "Correlations",
+                          label: "Habit\nCorrelations",
                           color: Colors.orangeAccent.shade700,
                           onPressed: () {
                             Navigator.push(context, MaterialPageRoute(builder: (_) => const CorrelationScreen()));
@@ -790,7 +865,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         ),
                         _SquareButton(
                           icon: Icons.pie_chart_outline,
-                          label: "Efficiency",
+                          label: "Sleep\nEfficiency",
                           color: Colors.blueAccent,
                           onPressed: () {
                             Navigator.push(context, MaterialPageRoute(builder: (_) => const SleepEfficiencyScreen()));
@@ -807,15 +882,24 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             ).then((_) => _loadTodayLog());
                           },
                         ),
-                        _SquareButton(
-                          icon: Icons.settings_outlined,
-                          label: "Settings",
-                          color: Colors.blueGrey,
-                          onPressed: () {
-                            Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
-                          },
-                        ),
                       ],
+                    ),
+
+                    const SizedBox(height: 32),
+                    
+                    // --- SETTINGS (Separate at Bottom) ---
+                    SizedBox(
+                      height: 56,
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.settings_outlined),
+                        label: const Text("App Settings"),
+                        style: OutlinedButton.styleFrom(
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                        onPressed: () {
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+                        },
+                      ),
                     ),
                     const SizedBox(height: 40),
                   ],
@@ -1094,7 +1178,16 @@ class SleepClockPainter extends CustomPainter {
        drawMarker(e.startTime, Colors.orange);
     }
 
-    canvas.restore(); // Restore the main rotation
+    // Shadow
+    canvas.drawCircle(
+      const Offset(0, 0), // using 0,0 since we are painting on a centered canvas
+      14, 
+      Paint()
+        ..color = Colors.black26
+        ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 4) 
+    );
+
+    canvas.restore(); 
   }
 
   @override
