@@ -59,7 +59,6 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
       DateTime bedTime = sleepEntry.bedTime;
 
       // --- FETCH HABITS FROM CURRENT AND PREVIOUS DAY ---
-      // This solves the issue where Coffee (16th 21:00) affects Sleep (17th log, bed 23:00 16th)
       List<SubstanceEntry> combinedSubstances = [];
       List<ExerciseEntry> combinedExercise = [];
 
@@ -69,11 +68,9 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
 
       // 2. Previous Day
       final prevDate = date.subtract(const Duration(days: 1));
-      // Need to find the key that matches prevDate (ignoring time components if keys differ slightly, though getAllLogs uses normalized UTC usually)
-      // Assuming keys are normalized YMD:
+      // Need to find the key that matches prevDate 
       final prevDateNormalized = DateTime.utc(prevDate.year, prevDate.month, prevDate.day);
       
-      // Try exact match or loose match if keys vary
       if (allLogs.containsKey(prevDateNormalized)) {
         final prevLog = allLogs[prevDateNormalized]!;
         combinedSubstances.addAll(prevLog.substanceLog);
@@ -96,7 +93,7 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
         DateTime? latest;
         for (var t in times) {
           if (t.isBefore(bedTime)) {
-            // Filter: Only look at habits within 12 hours of bed time to avoid irrelevant morning coffee from yesterday
+            // Filter: Only look at habits within 16 hours of bed time
             if (bedTime.difference(t).inHours < 16) { 
                if (latest == null || t.isAfter(latest)) {
                  latest = t;
@@ -107,9 +104,9 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
         return latest;
       }
 
-      // 1. Caffeine
+      // 1. Caffeine (Check for new 'caffeine' ID and legacy IDs)
       List<DateTime> caffeineTimes = combinedSubstances
-          .where((s) => ['coffee', 'tea', 'cola', 'energy_drink'].contains(s.substanceTypeId))
+          .where((s) => s.substanceTypeId == 'caffeine' || ['coffee', 'tea', 'cola', 'energy_drink'].contains(s.substanceTypeId))
           .map((s) => s.time)
           .toList();
       
@@ -118,9 +115,9 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
         points.add(_ScatterPoint(_timeToDouble(lastCaffeine), latency, _HabitType.caffeine));
       }
 
-      // 2. Alcohol
+      // 2. Alcohol (Check for 'alcohol' ID and legacy IDs)
       List<DateTime> alcoholTimes = combinedSubstances
-          .where((s) => ['alcohol', 'wine', 'beer'].contains(s.substanceTypeId))
+          .where((s) => s.substanceTypeId == 'alcohol' || ['wine', 'beer'].contains(s.substanceTypeId))
           .map((s) => s.time)
           .toList();
 

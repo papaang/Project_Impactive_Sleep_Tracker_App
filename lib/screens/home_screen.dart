@@ -1,5 +1,5 @@
 import 'dart:math'; // Required for the clock calculations
-import 'dart:ui' as ui;
+import 'dart:ui' as ui; // Added back to resolve TextDirection
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
@@ -23,7 +23,6 @@ import 'sleep_heatmap_screen.dart';
 import 'mid_sleep_graph_screen.dart'; 
 import 'sleep_efficiency_screen.dart';
 import 'correlation_screen.dart';
-
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -163,7 +162,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
 
     final newEntry = SubstanceEntry(
-      substanceTypeId: 'coffee',
+      substanceTypeId: 'caffeine',
       amount: cups.toString(),
       time: now,
     );
@@ -179,6 +178,38 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('$cups cup of caffeine logged at ${DateFormat('h:mm a').format(now)}'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  Future<void> _addOneAlcohol() async {
+    int drinks = 1; 
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    if (!isSameDay(_loadedDate, today)) {
+      _loadedDate = today;
+      _todayLog = await _logService.getDailyLog(today);
+    }
+
+    final newEntry = SubstanceEntry(
+      substanceTypeId: 'alcohol',
+      amount: drinks.toString(),
+      time: now,
+    );
+    
+    setState(() {
+      _todayLog.substanceLog.add(newEntry);
+    });
+    
+    await _logService.saveDailyLog(_loadedDate, _todayLog);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$drinks drink of alcohol logged at ${DateFormat('h:mm a').format(now)}'),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -304,7 +335,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ),
               );
             }),
-            // Option to add new day types inline (Other...)
             SimpleDialogOption(
               onPressed: () => Navigator.pop(context, Category(id: '__new__', name: 'Other', iconName: 'add', colorHex: '0xFF000000')),
               child: Row(
@@ -316,7 +346,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
             ),
             const Divider(),
-            // Manage Categories Option
             SimpleDialogOption(
               onPressed: () async {
                 Navigator.pop(context); // Close the dialog
@@ -408,7 +437,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
     await _logService.saveDailyLog(_loadedDate, _todayLog);
 
-    // Show notification
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -684,6 +712,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             ).then((_) => _loadTodayLog());
                           },
                         ),
+                        // --- NEW: Quick Add Alcohol Button ---
+                        _SquareButton(
+                          icon: Icons.wine_bar, 
+                          label: "+1 Alcohol",
+                          color: Colors.purple,
+                          onPressed: _addOneAlcohol,
+                          onLongPress: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => CaffeineAlcoholScreen(date: _loadedDate)),
+                            ).then((_) => _loadTodayLog());
+                          },
+                        ),
                         _SquareButton(
                           icon: Icons.fitness_center_outlined,
                           label: "Exercise",
@@ -755,7 +796,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             Navigator.push(context, MaterialPageRoute(builder: (_) => const SleepEfficiencyScreen()));
                           },
                         ),
-                      
                         _SquareButton(
                           icon: Icons.calendar_month_outlined,
                           label: "History",
@@ -786,12 +826,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 }
 
-// --- NEW SQUARE BUTTON WIDGET ---
+// ... _SquareButton and SleepClock classes (same as before) ...
 class _SquareButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback? onPressed;
-  final VoidCallback? onLongPress; // Added onLongPress
+  final VoidCallback? onLongPress; 
   final Color color;
 
   const _SquareButton({

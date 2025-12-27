@@ -41,9 +41,6 @@ class Category {
   );
 
   // get Icon from iconName
-  // Currently requires switch case for every available icon in 
-  // category screen due to Flutter issue flutter/flutter#145302
-  // https://github.com/flutter/flutter/issues/145302
   IconData get icon {
     switch (iconName) {
       case 'work_outline': return Icons.work_outline;
@@ -65,33 +62,27 @@ class Category {
     }
   }
 
-  // get Color from colorHex
-  // This is used to display the color dropdown to the user in
-  // the category screen
   Color get color {
     try {
       var intColor = int.tryParse(colorHex);
       if (intColor == null) {
-        return Color.fromARGB(255, 158, 158, 158); // Default color if parsing fails
+        return const Color.fromARGB(255, 158, 158, 158); 
       }
       else {
         return Color(intColor);
       }
     } catch (e) {
-      return Color.fromARGB(255, 158, 158, 158); // Default color if parsing fails
+      return const Color.fromARGB(255, 158, 158, 158); 
     }
   }
 
-  // get MaterialColor from colorHex
-  // This is used to assign the icon color
   MaterialColor get materialColor {
     try {
       var intColor = int.tryParse(colorHex);
       if (intColor == null) {
-        return Colors.grey; // Default color if parsing fails
+        return Colors.grey; 
       }
       else {
-        // define shades
         return MaterialColor(intColor, <int, Color>{
           50: Color(intColor).withAlpha(30),
           100: Color(intColor).withAlpha(55),
@@ -106,7 +97,7 @@ class Category {
         });
       }
     } catch (e) {
-      return Colors.grey; // Default color if parsing fails
+      return Colors.grey; 
     }
   }
   String get displayName => name;
@@ -122,6 +113,16 @@ class CategoryManager {
   Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
     await _initializeDefaultCategories();
+    
+    // Force migration to new 2-option substance list if detected old version
+    final substances = await getCategories('substance_types');
+    if (substances.any((c) => c.id == 'tea' || c.id == 'cola')) {
+       final newSubstanceTypes = [
+        Category(id: 'caffeine', name: 'Caffeine', iconName: 'coffee', colorHex: '0xFF795548'),
+        Category(id: 'alcohol', name: 'Alcohol', iconName: 'wine_bar', colorHex: '0xFF9C27B0'),
+      ];
+      await saveCategories('substance_types', newSubstanceTypes);
+    }
   }
 
   Future<void> _initializeDefaultCategories() async {
@@ -132,8 +133,6 @@ class CategoryManager {
         Category(id: 'relax', name: 'Relax', iconName: 'self_improvement_outlined', colorHex: '0xFF2E7D32'),
         Category(id: 'travel', name: 'Travel', iconName: 'explore_outlined', colorHex: '0xFFEF6C00'),
         Category(id: 'social', name: 'Social', iconName: 'people_outline', colorHex: '0xFF7B1FA2'),
-        // Commented out as "Other" day type category is not useful
-        // Category(id: 'other', name: 'Other', iconName: 'wb_sunny_outlined', colorHex: '0xFF424242'),
       ];
       await saveCategories('day_types', defaultDayTypes);
     }
@@ -160,7 +159,6 @@ class CategoryManager {
   }
 
   // Exercise Types
-  // note that exercise type cannot be edited by user in this version
   if (_prefs.getString('exercise_types') == null) {
     final defaultExerciseTypes = [
       Category(id: 'light', name: 'Light', iconName: 'directions_walk', colorHex: '0xFF4CAF50'),
@@ -171,13 +169,10 @@ class CategoryManager {
   }
 
   // Substance Types
-  // note that substance type cannot be edited by user in this version
   if (_prefs.getString('substance_types') == null) {
     final defaultSubstanceTypes = [
-      Category(id: 'coffee', name: 'Coffee', iconName: 'coffee', colorHex: '0xFF795548'),
-      // Category(id: 'tea', name: 'Tea', iconName: 'emoji_food_beverage', colorHex: '0xFF4CAF50'),
-      // Category(id: 'cola', name: 'Cola', iconName: 'local_drink', colorHex: '0xFF000000'),
-      // Category(id: 'alcohol', name: 'Alcohol', iconName: 'wine_bar', colorHex: '0xFF9C27B0'),
+      Category(id: 'caffeine', name: 'Caffeine', iconName: 'coffee', colorHex: '0xFF795548'),
+      Category(id: 'alcohol', name: 'Alcohol', iconName: 'wine_bar', colorHex: '0xFF9C27B0'),
     ];
     await saveCategories('substance_types', defaultSubstanceTypes);
   }
@@ -202,7 +197,6 @@ class CategoryManager {
 }
 
 // Legacy enum compatibility
-// TODO: check whether this is necessary
 enum DayType { work, relax, travel, social, other }
 enum SleepLocation { bed, couch, inTransit }
 
@@ -274,25 +268,25 @@ class SubstanceEntry {
   String amount;
   DateTime time;
 
-  SubstanceEntry({this.substanceTypeId = 'coffee', required this.amount, required this.time});
+  SubstanceEntry({this.substanceTypeId = 'caffeine', required this.amount, required this.time});
 
   String get name {
     switch (substanceTypeId) {
+      case 'caffeine': return 'Caffeine';
+      case 'alcohol': return 'Alcohol';
+      // Legacy support
       case 'coffee': return 'Coffee';
       case 'tea': return 'Tea';
       case 'cola': return 'Cola';
-      case 'alcohol': return 'Alcohol';
       default: return substanceTypeId[0].toUpperCase() + substanceTypeId.substring(1);
     }
   }
 
   Map<String, dynamic> toJson() => {'substanceTypeId': substanceTypeId, 'amount': amount, 'time': time.toIso8601String()};
   factory SubstanceEntry.fromJson(Map<String, dynamic> json) {
-    String id = json['substanceTypeId'] ?? json['name'] ?? 'coffee';
-    // Backward compatibility: map old names to ids
-    if (id == 'Coffee') id = 'coffee';
-    if (id == 'Tea') id = 'tea';
-    if (id == 'Cola') id = 'cola';
+    String id = json['substanceTypeId'] ?? json['name'] ?? 'caffeine';
+    // Backward compatibility mappings
+    if (id == 'Coffee' || id == 'Tea' || id == 'Cola') id = 'caffeine';
     if (id == 'Alcohol') id = 'alcohol';
     return SubstanceEntry(
       substanceTypeId: id, amount: json['amount'], time: DateTime.parse(json['time']));

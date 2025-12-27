@@ -11,12 +11,9 @@ class CategoryManagementScreen extends StatefulWidget {
 class _CategoryManagementScreenState extends State<CategoryManagementScreen> with TickerProviderStateMixin {
   late TabController _tabController;
   Map<String, List<Category>> _categories = {};
-  final List<String> _categoryTypes = ['day_types', 'sleep_locations', 'medication_types'];
-  final List<String> _categoryTypeName = ['Day Type', 'Sleep Location', 'Medication Type'];
-  final List<String> _categoryTypeNames = ['Day Types', 'Sleep Locations', 'Medication Types'];
-  // final List<String> _categoryTypes = ['day_types', 'sleep_locations', 'medication_types', 'exercise_types'];
-  // final List<String> _categoryTypeName = ['Day Type', 'Sleep Location', 'Medication Type', 'Exercise Type'];
-  // final List<String> _categoryTypeNames = ['Day Types', 'Sleep Locations', 'Medication Types', 'Exercise Types'];
+  final List<String> _categoryTypes = ['day_types', 'sleep_locations', 'medication_types', 'exercise_types', 'substance_types'];
+  final List<String> _categoryTypeName = ['Day Type', 'Sleep Location', 'Medication Type', 'Exercise Type', 'Substance Type'];
+  final List<String> _categoryTypeNames = ['Day Types', 'Sleep Locations', 'Medication Types', 'Exercise Types', 'Substance Types'];
 
   static const Map<String, String> iconDisplayNames = {
     'work_outline': 'Work',
@@ -34,6 +31,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
     'emoji_food_beverage': 'Food & Beverage',
     'local_drink': 'Drink',
     'wine_bar': 'Wine',
+    'add': 'Add',
   };
 
   static const Map<String, String> colorDisplayNames = {
@@ -47,6 +45,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
     '0xFFF44336': 'Red',
     '0xFF795548': 'Brown',
     '0xFF9C27B0': 'Pink',
+    '0xFF000000': 'Black',
   };
 
   @override
@@ -61,13 +60,15 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
     final dayTypes = await CategoryManager().getCategories('day_types');
     final sleepLocations = await CategoryManager().getCategories('sleep_locations');
     final medicationTypes = await CategoryManager().getCategories('medication_types');
-    // final exerciseTypes = await CategoryManager().getCategories('exercise_types');
+    final exerciseTypes = await CategoryManager().getCategories('exercise_types');
+    final substanceTypes = await CategoryManager().getCategories('substance_types');
     setState(() {
       _categories = {
         'day_types': dayTypes,
         'sleep_locations': sleepLocations,
         'medication_types': medicationTypes,
-        // 'exercise_types': exerciseTypes,
+        'exercise_types': exerciseTypes,
+        'substance_types': substanceTypes,
       };
     });
   }
@@ -79,6 +80,13 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
     String selectedColor = isEdit ? category.colorHex : '0xFF1565C0';
     final dosageController = TextEditingController(text: isEdit && category.defaultDosage != null ? category.defaultDosage.toString() : '');
 
+    // Defaults for specific types if not editing
+    if (!isEdit) {
+       if (categoryType == 'medication_types') { selectedIcon = 'medication'; selectedColor = '0xFFEF6C00'; }
+       else if (categoryType == 'exercise_types') { selectedIcon = 'fitness_center'; selectedColor = '0xFF4CAF50'; }
+       else if (categoryType == 'substance_types') { selectedIcon = 'local_drink'; selectedColor = '0xFF795548'; }
+    }
+
     final result = await showDialog<Map<String, String>>(
       context: context,
       builder: (context) => AlertDialog(
@@ -89,11 +97,12 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
             children: [
               TextField(
                 controller: nameController,
-                decoration: InputDecoration(labelText: 'Name'),
+                decoration: const InputDecoration(labelText: 'Name'),
+                textCapitalization: TextCapitalization.sentences,
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                initialValue: selectedIcon,
+                value: selectedIcon, // Changed from initialValue to value to reflect updates
                 items: [
                   'work_outline',
                   'self_improvement_outlined',
@@ -110,6 +119,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
                   'emoji_food_beverage',
                   'local_drink',
                   'wine_bar',
+                  'add',
                 ].map((icon) => DropdownMenuItem(
                   value: icon,
                   child: Row(
@@ -121,11 +131,11 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
                   ),
                 )).toList(),
                 onChanged: (value) => selectedIcon = value!,
-                decoration: InputDecoration(labelText: 'Icon'),
+                decoration: const InputDecoration(labelText: 'Icon'),
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                initialValue: selectedColor,
+                value: selectedColor, // Changed from initialValue to value
                 items: [
                   '0xFF1565C0', // blue
                   '0xFF2E7D32', // green
@@ -137,6 +147,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
                   '0xFFF44336', // red
                   '0xFF795548', // brown
                   '0xFF9C27B0', // pink
+                  '0xFF000000', // black
                 ].map((color) => DropdownMenuItem(
                   value: color,
                   child: Row(
@@ -152,14 +163,14 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
                   ),
                 )).toList(),
                 onChanged: (value) => selectedColor = value!,
-                decoration: InputDecoration(labelText: 'Color'),
+                decoration: const InputDecoration(labelText: 'Color'),
               ),
               if (categoryType == 'medication_types') ...[
                 const SizedBox(height: 16),
                 TextField(
                   controller: dosageController,
                   keyboardType: TextInputType.number,
-                  decoration: InputDecoration(labelText: 'Default Dosage (mg)'),
+                  decoration: const InputDecoration(labelText: 'Default Dosage (mg, optional)'),
                 ),
               ],
             ],
@@ -168,7 +179,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel'),
+            child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () {
@@ -189,6 +200,12 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
       ),
     );
     if (result != null) {
+      // Parse default dosage to int?
+      int? defDosage;
+      if (result['defaultDosage'] != null && result['defaultDosage']!.trim().isNotEmpty) {
+        defDosage = int.tryParse(result['defaultDosage']!);
+      }
+
       if (isEdit) {
         // Edit existing
         final updated = Category(
@@ -196,7 +213,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
           name: result['name']!,
           iconName: result['iconName']!,
           colorHex: result['colorHex']!,
-          defaultDosage: result['defaultDosage'] != null ? int.tryParse(result['defaultDosage']!) : category.defaultDosage,
+          defaultDosage: defDosage,
         );
         final index = _categories[categoryType]!.indexWhere((c) => c.id == category.id);
         if (index != -1) {
@@ -212,7 +229,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
           name: result['name']!,
           iconName: result['iconName']!,
           colorHex: result['colorHex']!,
-          defaultDosage: result['defaultDosage'] != null ? int.tryParse(result['defaultDosage']!) : null,
+          defaultDosage: defDosage,
         );
         _categories[categoryType]!.add(newCategory);
         await CategoryManager().saveCategories(categoryType, _categories[categoryType]!);
@@ -225,17 +242,11 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Delete Category'),
+        title: const Text('Delete Category'),
         content: Text('Are you sure you want to delete "${category.name}"?'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text('Delete'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
         ],
       ),
     );
@@ -250,22 +261,24 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Reset Categories'),
-        content: Text('Are you sure you want to reset all categories to their default values? This action cannot be undone.'),
+        title: const Text('Reset Categories'),
+        content: const Text('Are you sure you want to reset all categories to their default values? This action cannot be undone.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel'),
+            child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text('Reset'),
+            child: const Text('Reset'),
           ),
         ],
       ),
     );
     if (confirmed == true) {
-      // Define default categories
+      // Define default categories (re-using definitions from models.dart/CategoryManager)
+      // Ideally CategoryManager should have a public reset method, but implementing here for now.
+      
       final defaultDayTypes = [
         Category(id: 'work', name: 'Work', iconName: 'work_outline', colorHex: '0xFF1565C0'),
         Category(id: 'relax', name: 'Relax', iconName: 'self_improvement_outlined', colorHex: '0xFF2E7D32'),
@@ -283,13 +296,22 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
         Category(id: 'sertraline', name: 'Sertraline', iconName: 'medication', colorHex: '0xFF7B1FA2', defaultDosage: 50),
         Category(id: 'lisdexamfetamine', name: 'Lisdexamfetamine', iconName: 'medication', colorHex: '0xFFEF6C00', defaultDosage: 50),
       ];
+      final defaultExerciseTypes = [
+        Category(id: 'light', name: 'Light', iconName: 'directions_walk', colorHex: '0xFF4CAF50'),
+        Category(id: 'medium', name: 'Medium', iconName: 'directions_run', colorHex: '0xFFFF9800'),
+        Category(id: 'heavy', name: 'Heavy', iconName: 'fitness_center', colorHex: '0xFFF44336'),
+      ];
+       final defaultSubstanceTypes = [
+        Category(id: 'caffeine', name: 'Caffeine', iconName: 'coffee', colorHex: '0xFF795548'),
+        Category(id: 'alcohol', name: 'Alcohol', iconName: 'wine_bar', colorHex: '0xFF9C27B0'),
+      ];
 
-      // Save default categories
       await CategoryManager().saveCategories('day_types', defaultDayTypes);
       await CategoryManager().saveCategories('sleep_locations', defaultSleepLocations);
       await CategoryManager().saveCategories('medication_types', defaultMedicationTypes);
+      await CategoryManager().saveCategories('exercise_types', defaultExerciseTypes);
+      await CategoryManager().saveCategories('substance_types', defaultSubstanceTypes);
 
-      // Reload categories
       await _loadCategories();
     }
   }
@@ -298,10 +320,10 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Manage Categories'),
+        title: const Text('Manage Categories'),
         actions: [
           IconButton(
-            icon: Icon(Icons.replay),
+            icon: const Icon(Icons.replay),
             onPressed: _resetCategories,
             tooltip: 'Reset Categories',
           ),
@@ -309,8 +331,9 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
         bottom: TabBar(
           controller: _tabController,
           tabs: _categoryTypeNames.map((name) => Tab(text: name)).toList(),
-          unselectedLabelColor: Color(0xffDDDADA),
-          labelColor: Color(0xffDDDADA),
+          isScrollable: true,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
         ),
       ),
       body: TabBarView(
@@ -322,10 +345,10 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
             itemBuilder: (context, index) {
               final cat = cats[index];
               return ListTile(
-                leading: Icon(cat.icon, color: cat.materialColor),
-                title: Text(cat.name),
+                leading: Icon(cat.icon, color: cat.color), // Fixed: Use cat.color
+                title: Text(cat.name + (cat.defaultDosage != null ? ' (${cat.defaultDosage} mg)' : '')),
                 trailing: IconButton(
-                  icon: Icon(Icons.delete),
+                  icon: const Icon(Icons.delete),
                   onPressed: () => _deleteCategory(type, cat),
                 ),
                 onTap: () => _showAddEditDialog(type, category: cat),
@@ -335,15 +358,17 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
         }).toList(),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        icon: Icon(Icons.add),
-        label: Text('New ${_categoryTypeName[_tabController.index]}'),
+        icon: const Icon(Icons.add),
+        label: Text('New ${_categoryTypeName.length > _tabController.index ? _categoryTypeName[_tabController.index] : 'Category'}'),
         onPressed: () => _showAddEditDialog(_categoryTypes[_tabController.index]),
       ),
     );
   }
+  
   @override
   void dispose() {
     _tabController.removeListener(() {});
+    _tabController.dispose();
     super.dispose();
   }
 }

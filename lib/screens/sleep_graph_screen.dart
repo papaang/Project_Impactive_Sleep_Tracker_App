@@ -294,13 +294,13 @@ class GraphRowPainter extends CustomPainter {
       canvas.drawRect(Rect.fromLTWH(x, 0, hourWidth, size.height), boxPaint);
     }
 
+    // 2. Draw Events from ALL logs
     final sleepFillPaint = Paint()..style = PaintingStyle.fill..color = isDark ? Colors.indigoAccent.withOpacity(0.5) : Colors.indigo.withOpacity(0.3);
     final bedLinePaint = Paint()..style = PaintingStyle.stroke..strokeWidth = 3..color = isDark ? Colors.tealAccent : Colors.teal[700]!;
     
     // List to collect all symbols before drawing
     List<_GraphSymbol> symbols = [];
 
-    // 2. Draw Events from ALL logs
     for (var log in logs) {
       // Draw Sleep Bars & Bed Time Lines
       for (var entry in log.sleepLog) {
@@ -328,11 +328,20 @@ class GraphRowPainter extends CustomPainter {
       }
 
       // Collect Symbols
-      // Caffeine (C/A)
+      // Caffeine (C/A) - UPDATED LOGIC HERE
       for (var s in log.substanceLog) {
         String code = "C"; 
-        if (s.substanceTypeId.contains('alcohol') || s.substanceTypeId.contains('wine')) code = "A";
-        else if (s.substanceTypeId.contains('cola')) code = "C";
+        
+        // Check for 'alcohol' ID or legacy names
+        if (s.substanceTypeId == 'alcohol' || 
+            s.substanceTypeId.toLowerCase().contains('wine') || 
+            s.substanceTypeId.toLowerCase().contains('beer')) {
+             code = "A";
+        }
+        else if (s.substanceTypeId.toLowerCase().contains('cola')) {
+             code = "C"; // cola is caffeine
+        }
+        
         Color c = code == "A" ? Colors.red : Colors.brown;
         symbols.add(_GraphSymbol(code, s.time, c));
       }
