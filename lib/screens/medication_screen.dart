@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models.dart';
 import '../log_service.dart';
-import 'category_management_screen.dart';
+import 'category_management_screen.dart'; // Added import
 
 class MedicationScreen extends StatefulWidget {
   final DateTime date;
@@ -126,40 +126,92 @@ class _MedicationScreenState extends State<MedicationScreen> {
     }
   }
 
-  Future<void> _showDosageDialog(Category selectedType) async {
+  Future<void> _showDosageDialog(Category selectedType, {MedicationEntry? existingEntry, int? index}) async {
     String? dosage;
+    Category currentDialogType = selectedType;
     
-    // Check if default dosage exists (handled as int now)
-    if (selectedType.defaultDosage != null) {
-      dosage = selectedType.defaultDosage.toString();
-    } else {
-      // If no default, ask user
-      dosage = await showDialog<String>(
+    // Check if we should show the dialog (editing OR no default dosage)
+    bool showDialogInput = existingEntry != null || selectedType.defaultDosage == null;
+
+    if (showDialogInput) {
+      String initialDosage = existingEntry?.dosage ?? '';
+      
+      final result = await showDialog<Map<String, dynamic>>(
           context: context,
           builder: (context) {
-              final controller = TextEditingController();
-              return AlertDialog(
-                  title: const Text('Enter Dosage (mg)'),
-                  content: TextField(
-                      controller: controller,
-                      keyboardType: TextInputType.number,
-                      autofocus: true,
-                      decoration: const InputDecoration(hintText: 'e.g. 5 or 10'),
-                  ),
-                  actions: [
-                      TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-                      TextButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('OK')),
-                  ],
+              final controller = TextEditingController(text: initialDosage);
+              return StatefulBuilder(
+                builder: (context, setStateDialog) {
+                  return AlertDialog(
+                      title: Text(existingEntry != null ? 'Edit Entry' : 'Enter Details'),
+                      content: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            DropdownButtonFormField<String>(
+                              isExpanded: true,
+                              decoration: const InputDecoration(labelText: 'Medication'),
+                              value: _medicationTypes.any((c) => c.id == currentDialogType.id) ? currentDialogType.id : null,
+                              items: _medicationTypes.map((cat) {
+                                return DropdownMenuItem(
+                                  value: cat.id,
+                                  child: Row(
+                                    children: [
+                                      Icon(cat.icon, color: cat.color, size: 20),
+                                      const SizedBox(width: 10),
+                                      Expanded(child: Text(cat.name, overflow: TextOverflow.ellipsis)),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setStateDialog(() {
+                                    currentDialogType = _medicationTypes.firstWhere((c) => c.id == val);
+                                  });
+                                }
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            TextField(
+                                controller: controller,
+                                keyboardType: TextInputType.number,
+                                autofocus: existingEntry == null && controller.text.isEmpty,
+                                decoration: const InputDecoration(labelText: 'Dosage (mg/pill)', hintText: 'e.g. 5 or 10'),
+                            ),
+                          ],
+                        ),
+                      ),
+                      actions: [
+                          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, {
+                              'dosage': controller.text,
+                              'type': currentDialogType
+                            }), 
+                            child: const Text('OK')
+                          ),
+                      ],
+                  );
+                }
               );
           }
       );
+      
+      if (result == null) return; 
+      dosage = result['dosage'];
+      currentDialogType = result['type'];
+    } else {
+      dosage = selectedType.defaultDosage.toString();
     }
 
-    if (dosage == null) return; 
+    if (dosage == null) return;
+
+    DateTime initialTime = existingEntry?.time ?? DateTime.now();
 
     final TimeOfDay? time = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.now(),
+      initialTime: TimeOfDay.fromDateTime(initialTime),
       helpText: 'Time taken',
     );
     if (time == null) return;
@@ -173,13 +225,17 @@ class _MedicationScreenState extends State<MedicationScreen> {
     );
     
     final newEntry = MedicationEntry(
-      medicationTypeId: selectedType.id, 
-      dosage: dosage.isEmpty ? "Standard" : dosage, 
+      medicationTypeId: currentDialogType.id, 
+      dosage: dosage!.isEmpty ? "Standard" : dosage!, 
       time: entryTime
     );
     
     setState(() {
-      _log.medicationLog.add(newEntry);
+      if (index != null) {
+        _log.medicationLog[index] = newEntry;
+      } else {
+        _log.medicationLog.add(newEntry);
+      }
     });
     _saveLog();
   }
@@ -216,12 +272,10 @@ class _MedicationScreenState extends State<MedicationScreen> {
                         crossAxisCount: 2,
                         crossAxisSpacing: 12,
                         mainAxisSpacing: 12,
-                        childAspectRatio: 2.5, // Wide buttons
+                        childAspectRatio: 2.5, 
                       ),
-                      // Add 2 extra items: "Add New" and "Manage"
                       itemCount: _medicationTypes.length + 2,
                       itemBuilder: (context, index) {
-                        // 1. "Add New" Button
                         if (index == _medicationTypes.length) {
                           return _MedicationTile(
                             label: "Add New...",
@@ -229,13 +283,12 @@ class _MedicationScreenState extends State<MedicationScreen> {
                             color: Colors.grey,
                             isOutline: true,
                             onTap: () {
-                              Navigator.pop(context); // Close sheet
+                              Navigator.pop(context); 
                               _addNewMedicationType();
                             },
                           );
                         }
                         
-                        // 2. "Manage Categories" Button
                         if (index == _medicationTypes.length + 1) {
                            return _MedicationTile(
                             label: "Manage...",
@@ -243,35 +296,30 @@ class _MedicationScreenState extends State<MedicationScreen> {
                             color: Colors.blueGrey,
                             isOutline: true,
                             onTap: () async {
-                              Navigator.pop(context); // Close the dialog
+                              Navigator.pop(context); 
                               await Navigator.push(
                                 context,
                                 MaterialPageRoute(builder: (_) => const CategoryManagementScreen()),
                               );
-                              // Reload medication types after returning from category management
                               final medicationTypes = await CategoryManager().getCategories('medication_types');
                               setState(() {
                                 _medicationTypes = medicationTypes;
                               });
-                              // Re-open sheet to show changes
                               if(mounted) _showAddMedicationSheet();
                             },
                           );
                         }
 
                         final cat = _medicationTypes[index];
-                        // // Show name + dosage hint if available
-                        // final label = cat.name + (cat.defaultDosage != null ? ' (${cat.defaultDosage} mg)' : '');
-                        
                         return GestureDetector(
                           onLongPress: () {
                             Navigator.pop(context);
                             _deleteMedicationType(cat);
                           },
                           child: _MedicationTile(
+                            label: cat.name, // Use just name here as dosage is separate
                             name: cat.name,
-                            dosage: (cat.defaultDosage != null ? '${cat.defaultDosage} mg' : ''),
-                            // label: label,
+                            dosage: (cat.defaultDosage != null ? '${cat.defaultDosage} mg' : null),
                             icon: cat.icon,
                             color: cat.color,
                             onTap: () {
@@ -308,7 +356,7 @@ class _MedicationScreenState extends State<MedicationScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Medication', style: TextStyle(fontSize: 20)),
+            const Text('Medication Log', style: TextStyle(fontSize: 20)),
             Text(
               displayDate,
               style: const TextStyle(
@@ -330,7 +378,7 @@ class _MedicationScreenState extends State<MedicationScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8.0),
                     child: Text(
-                      'Medication Log',
+                      'Medication Entries',
                       style: Theme.of(context)
                           .textTheme
                           .headlineSmall
@@ -366,6 +414,15 @@ class _MedicationScreenState extends State<MedicationScreen> {
                             title: Text(displayName, style: const TextStyle(fontWeight: FontWeight.bold)),
                             subtitle: Text("Dosage: ${item.dosage} mg \nTime: ${DateFormat('h:mm a').format(item.time)}"),
                             isThreeLine: true,
+                            onTap: () {
+                                final cat = category ?? Category(
+                                  id: item.medicationTypeId, 
+                                  name: item.medicationTypeId, 
+                                  iconName: 'medication', 
+                                  colorHex: '0xFFEF6C00'
+                                );
+                                _showDosageDialog(cat, existingEntry: item, index: index);
+                            },
                             trailing: IconButton(
                               icon: const Icon(Icons.delete_outline, color: Colors.red),
                               onPressed: () => _deleteMedicationEntry(index),
@@ -388,18 +445,18 @@ class _MedicationScreenState extends State<MedicationScreen> {
 }
 
 class _MedicationTile extends StatelessWidget {
+  final String label;
   final String? name;
   final String? dosage;
-  final String? label;
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
   final bool isOutline;
 
   const _MedicationTile({
+    required this.label,
     this.name,
     this.dosage,
-    this.label,
     required this.icon,
     required this.color,
     required this.onTap,
@@ -429,6 +486,7 @@ class _MedicationTile extends StatelessWidget {
                     ? Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
                             name!,
@@ -438,19 +496,20 @@ class _MedicationTile extends StatelessWidget {
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
-                          if (dosage != null)
+                          if (dosage != null && dosage!.isNotEmpty)
                             Text(
                               dosage!,
                               style: TextStyle(
-                                color: isOutline ? color : Theme.of(context).colorScheme.onSurface,
+                                color: isOutline ? color : Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                                 fontWeight: FontWeight.normal,
+                                fontSize: 12,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
                         ],
                       )
                     : Text(
-                        label!,
+                        label,
                         style: TextStyle(
                           color: isOutline ? color : Theme.of(context).colorScheme.onSurface,
                           fontWeight: FontWeight.w600,

@@ -5,7 +5,7 @@ import '../log_service.dart';
 
 class ExerciseScreen extends StatefulWidget {
   final DateTime date;
-  final bool autoOpenAdd; // Added for notification shortcut
+  final bool autoOpenAdd; 
 
   const ExerciseScreen({super.key, required this.date, this.autoOpenAdd = false});
 
@@ -35,7 +35,6 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
         _exerciseTypes = exerciseTypes;
       });
 
-      // Handle auto-open if requested
       if (widget.autoOpenAdd && mounted) {
         Future.delayed(const Duration(milliseconds: 300), _addExerciseEntry);
       }
@@ -61,6 +60,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
   }
 
   Future<void> _addExerciseEntry() async {
+    // 1. Select Type
     final Category? selectedType = await showDialog<Category>(
       context: context,
       builder: (context) => SimpleDialog(
@@ -79,51 +79,134 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     );
     if (selectedType == null) return;
 
-    final TimeOfDay? startTime = await _showTimePicker(
-      TimeOfDay.now(),
-      helpText: 'Select Start Time',
-    );
-    if (startTime == null) return;
+    await _showEntryDialog(type: selectedType);
+  }
 
-    final TimeOfDay? finishTime = await _showTimePicker(
-      startTime,
-      helpText: 'Select Finish Time',
-    );
-    if (finishTime == null) return;
+  Future<void> _editExerciseEntry(int index) async {
+    final entry = _log.exerciseLog[index];
+    final category = _exerciseTypes.where((c) => c.id == entry.exerciseTypeId).firstOrNull 
+        ?? Category(id: entry.exerciseTypeId, name: entry.type, iconName: 'fitness_center', colorHex: '0xFFEF6C00');
+    
+    await _showEntryDialog(existingEntry: entry, index: index, type: category);
+  }
 
-    final DateTime startDateTime = DateTime(
-      widget.date.year,
-      widget.date.month,
-      widget.date.day,
-      startTime.hour,
-      startTime.minute,
-    );
-    final DateTime finishDateTime = DateTime(
-      widget.date.year,
-      widget.date.month,
-      widget.date.day,
-      finishTime.hour,
-      finishTime.minute,
-    );
+  Future<void> _showEntryDialog({ExerciseEntry? existingEntry, int? index, required Category type}) async {
+    DateTime startTime = existingEntry?.startTime ?? DateTime.now();
+    DateTime endTime = existingEntry?.finishTime ?? DateTime.now().add(const Duration(minutes: 30));
+    Category currentDialogType = type;
 
-    if (finishDateTime.isBefore(startDateTime)) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Finish time cannot be before start time.')),
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              title: Text(existingEntry == null ? 'Add ${type.name}' : 'Edit Entry'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Exercise Type Selector
+                    DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      decoration: const InputDecoration(labelText: 'Activity Type'),
+                      value: _exerciseTypes.any((c) => c.id == currentDialogType.id) ? currentDialogType.id : null,
+                      items: _exerciseTypes.map((cat) {
+                        return DropdownMenuItem(
+                          value: cat.id,
+                          child: Row(
+                            children: [
+                              Icon(cat.icon, color: cat.color, size: 20),
+                              const SizedBox(width: 10),
+                              Expanded(child: Text(cat.name, overflow: TextOverflow.ellipsis)),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setStateDialog(() {
+                            currentDialogType = _exerciseTypes.firstWhere((c) => c.id == val);
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    ListTile(
+                      title: const Text("Start Time"),
+                      trailing: Text(DateFormat('h:mm a').format(startTime)),
+                      onTap: () async {
+                        final t = await showTimePicker(context: context, initialTime: TimeOfDay.fromDateTime(startTime));
+                        if (t != null) {
+                          setStateDialog(() {
+                             startTime = DateTime(widget.date.year, widget.date.month, widget.date.day, t.hour, t.minute);
+                             // Adjust end time if before start
+                             if (endTime.isBefore(startTime)) endTime = startTime.add(const Duration(minutes: 30));
+                          });
+                        }
+                      },
+                    ),
+                    ListTile(
+                      title: const Text("End Time"),
+                      trailing: Text(DateFormat('h:mm a').format(endTime)),
+                      onTap: () async {
+                        final t = await showTimePicker(context: context, initialTime: TimeOfDay.fromDateTime(endTime));
+                        if (t != null) {
+                           setStateDialog(() {
+                             endTime = DateTime(widget.date.year, widget.date.month, widget.date.day, t.hour, t.minute);
+                           });
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context, {
+                    'start': startTime, 
+                    'end': endTime,
+                    'type': currentDialogType
+                  }),
+                  child: Text(existingEntry == null ? 'Add' : 'Save'),
+                ),
+              ],
+            );
+          }
         );
       }
-      return;
-    }
-
-    final newEntry = ExerciseEntry(
-      exerciseTypeId: selectedType.id,
-      startTime: startDateTime,
-      finishTime: finishDateTime,
     );
 
-    setState(() {
-      _log.exerciseLog.add(newEntry);
-    });
+    if (result == null) return;
+
+    final start = result['start'] as DateTime;
+    DateTime end = result['end'] as DateTime;
+    final Category selectedCategory = result['type'] as Category;
+    
+    // Fix logic if end is before start (assume next day? or error?)
+    // If end is before start, assume it's next day (e.g. 11pm to 12am)
+    if (end.isBefore(start)) {
+      end = end.add(const Duration(days: 1));
+    }
+
+    if (existingEntry != null && index != null) {
+      setState(() {
+        _log.exerciseLog[index] = ExerciseEntry(
+          exerciseTypeId: selectedCategory.id,
+          startTime: start,
+          finishTime: end
+        );
+      });
+    } else {
+      setState(() {
+        _log.exerciseLog.add(ExerciseEntry(
+          exerciseTypeId: selectedCategory.id,
+          startTime: start,
+          finishTime: end
+        ));
+      });
+    }
     _saveLog();
   }
 
@@ -149,7 +232,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-           const Text('Exercise', style: TextStyle(fontSize: 20)),
+            const Text('Exercise Log', style: TextStyle(fontSize: 20)),
             Text(
               displayDate,
               style: const TextStyle(
@@ -171,7 +254,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8.0),
                     child: Text(
-                      'Exercise Log',
+                      'Exercise Entries',
                       style: Theme.of(context)
                           .textTheme
                           .headlineSmall
@@ -192,6 +275,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
                               style: const TextStyle(fontWeight: FontWeight.bold)),
                           subtitle: Text(
                               '${DateFormat('h:mm a').format(item.startTime)} - ${DateFormat('h:mm a').format(item.finishTime)} (${_getDuration(item.startTime, item.finishTime)})'),
+                          onTap: () => _editExerciseEntry(idx), // Added Tap to Edit
                           trailing: IconButton(
                             icon: const Icon(Icons.delete_outline, color: Colors.red),
                             onPressed: () => _deleteExerciseEntry(idx),

@@ -5,10 +5,9 @@ import '../log_service.dart';
 
 class CaffeineAlcoholScreen extends StatefulWidget {
   final DateTime date;
-   final bool autoOpenAdd; // Added for notification shortcut
+  final bool autoOpenAdd; 
 
   const CaffeineAlcoholScreen({super.key, required this.date, this.autoOpenAdd = false});
-  
 
   @override
   State<CaffeineAlcoholScreen> createState() => _CaffeineAlcoholScreenState();
@@ -35,9 +34,12 @@ class _CaffeineAlcoholScreenState extends State<CaffeineAlcoholScreen> {
         _log = log;
         _substanceTypes = substanceTypes;
       });
+
+      // Handle auto-open if requested via notification
       if (widget.autoOpenAdd && mounted) {
         Future.delayed(const Duration(milliseconds: 300), _addEntry);
       }
+
     } catch (e) {
        // handle error
     } finally {
@@ -50,7 +52,7 @@ class _CaffeineAlcoholScreenState extends State<CaffeineAlcoholScreen> {
   }
 
   Future<void> _addEntry() async {
-    // 1. Select Type (Caffeine or Alcohol)
+    // 1. Select Type
     final Category? selectedType = await showDialog<Category>(
       context: context,
       builder: (context) => SimpleDialog(
@@ -69,33 +71,53 @@ class _CaffeineAlcoholScreenState extends State<CaffeineAlcoholScreen> {
     );
     if (selectedType == null) return;
 
-    // 2. Custom Popup for Amount & Time
-    int count = 1; // Default
-    DateTime selectedTime = DateTime.now(); // Default current time
-    String unit = selectedType.id == 'alcohol' ? 'drink' : 'cup';
+    // 2. Show Edit/Add Dialog
+    await _showEntryDialog(type: selectedType);
+  }
+
+  Future<void> _editEntry(int index) async {
+    final entry = _log.substanceLog[index];
+    // Find category object for this entry to get icon/color
+    final category = _substanceTypes.where((c) => c.id == entry.substanceTypeId).firstOrNull 
+        ?? Category(id: entry.substanceTypeId, name: entry.name, iconName: 'local_drink', colorHex: '0xFF795548');
+    
+    await _showEntryDialog(existingEntry: entry, index: index, type: category);
+  }
+
+  Future<void> _showEntryDialog({SubstanceEntry? existingEntry, int? index, required Category type}) async {
+    // Parse existing amount if possible, else default to 1
+    int count = 1;
+    if (existingEntry != null) {
+      final match = RegExp(r'\d+').firstMatch(existingEntry.amount);
+      if (match != null) {
+        count = int.parse(match.group(0)!);
+      }
+    }
+
+    DateTime selectedTime = existingEntry?.time ?? DateTime.now();
+    String unit = type.id == 'alcohol' ? 'drink' : 'cup';
 
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) {
-        // Use StatefulBuilder to update state within the dialog
         int tempCount = count;
         DateTime tempTime = selectedTime;
 
         return StatefulBuilder(
           builder: (context, setStateDialog) {
             return AlertDialog(
-              title: Text('Add ${selectedType.name}'),
+              title: Text(existingEntry == null ? 'Add ${type.name}' : 'Edit ${type.name}'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Amount Row
+                  // Amount
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text('Number of ${unit}s:'),
                       DropdownButton<int>(
                         value: tempCount,
-                        items: List.generate(10, (index) => index + 1).map((val) {
+                        items: List.generate(20, (index) => index + 1).map((val) {
                           return DropdownMenuItem(
                             value: val,
                             child: Text(val.toString()),
@@ -110,7 +132,7 @@ class _CaffeineAlcoholScreenState extends State<CaffeineAlcoholScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  // Time Row
+                  // Time
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     title: const Text("Time:"),
@@ -154,7 +176,7 @@ class _CaffeineAlcoholScreenState extends State<CaffeineAlcoholScreen> {
                   onPressed: () {
                     Navigator.pop(context, {'count': tempCount, 'time': tempTime});
                   },
-                  child: const Text('Confirm'),
+                  child: Text(existingEntry == null ? 'Add' : 'Save'),
                 ),
               ],
             );
@@ -163,21 +185,32 @@ class _CaffeineAlcoholScreenState extends State<CaffeineAlcoholScreen> {
       },
     );
 
-    if (result == null) return; // Cancelled
+    if (result == null) return;
 
     final int finalCount = result['count'];
     final DateTime finalTime = result['time'];
     final String amountString = "$finalCount $unit${finalCount > 1 ? 's' : ''}";
 
-    final newEntry = SubstanceEntry(
-      substanceTypeId: selectedType.id, 
-      amount: amountString, 
-      time: finalTime
-    );
-    
-    setState(() {
-      _log.substanceLog.add(newEntry);
-    });
+    if (existingEntry != null && index != null) {
+      // Update existing
+      setState(() {
+        _log.substanceLog[index] = SubstanceEntry(
+          substanceTypeId: type.id,
+          amount: amountString,
+          time: finalTime
+        );
+      });
+    } else {
+      // Create new
+      final newEntry = SubstanceEntry(
+        substanceTypeId: type.id, 
+        amount: amountString, 
+        time: finalTime
+      );
+      setState(() {
+        _log.substanceLog.add(newEntry);
+      });
+    }
     _saveLog();
   }
 
@@ -227,29 +260,42 @@ class _CaffeineAlcoholScreenState extends State<CaffeineAlcoholScreen> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  Column(
-                    children: _log.substanceLog.asMap().entries.map((entry) {
-                      int idx = entry.key;
-                      SubstanceEntry item = entry.value;
-                      final category = _substanceTypes.where((c) => c.id == item.substanceTypeId).firstOrNull;
-                      final displayName = category?.name ?? item.name;
-                      return Card(
-                        margin: const EdgeInsets.symmetric(vertical: 6),
-                        child: ListTile(
-                          leading: Icon(category?.icon ?? Icons.local_drink,
-                              color: category?.color ?? Colors.brown),
-                          title: Text("$displayName: ${item.amount}",
-                              style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle:
-                              Text(DateFormat('h:mm a').format(item.time)),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.delete_outline, color: Colors.red),
-                            onPressed: () => _deleteEntry(idx),
+                  if (_log.substanceLog.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Center(
+                         child: Text(
+                           "No entries yet.",
+                           style: TextStyle(color: Colors.grey, fontSize: 16),
+                         ),
+                      ),
+                    )
+                  else
+                    Column(
+                      children: _log.substanceLog.asMap().entries.map((entry) {
+                        int idx = entry.key;
+                        SubstanceEntry item = entry.value;
+                        final category = _substanceTypes.where((c) => c.id == item.substanceTypeId).firstOrNull;
+                        final displayName = category?.name ?? item.name;
+                        
+                        return Card(
+                          margin: const EdgeInsets.symmetric(vertical: 6),
+                          child: ListTile(
+                            leading: Icon(category?.icon ?? Icons.local_drink,
+                                color: category?.color ?? Colors.brown),
+                            title: Text("$displayName: ${item.amount}",
+                                style: const TextStyle(fontWeight: FontWeight.bold)),
+                            subtitle:
+                                Text(DateFormat('h:mm a').format(item.time)),
+                            onTap: () => _editEntry(idx), // Added Tap to Edit
+                            trailing: IconButton(
+                              icon: const Icon(Icons.delete_outline, color: Colors.red),
+                              onPressed: () => _deleteEntry(idx),
+                            ),
                           ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
+                        );
+                      }).toList(),
+                    ),
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
                     icon: const Icon(Icons.add),
