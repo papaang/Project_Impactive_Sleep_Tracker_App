@@ -1,5 +1,5 @@
 import 'dart:math';
-import 'dart:ui' as ui; // Added to resolve TextDirection and MaskFilter
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../log_service.dart';
@@ -8,7 +8,7 @@ import 'medication_screen.dart';
 import 'caffeine_alcohol_screen.dart';
 import 'exercise_screen.dart';
 import 'notes_screen.dart';
-import 'category_management_screen.dart'; // Added import
+import 'category_management_screen.dart'; 
 
 class EventScreen extends StatefulWidget {
   final DateTime date;
@@ -232,6 +232,8 @@ class _EventScreenState extends State<EventScreen> {
       builder: (context) {
         return SleepSessionEditor(
           initialEntry: entry,
+          // Pass the reference date (widget.date) to the editor
+          referenceDate: widget.date,
           onSave: (updatedEntry) {
             setState(() {
               _log.sleepLog[index] = updatedEntry;
@@ -263,6 +265,8 @@ class _EventScreenState extends State<EventScreen> {
       builder: (context) {
         return SleepSessionEditor(
           initialEntry: newEntry,
+          // Pass the reference date (widget.date) to the editor
+          referenceDate: widget.date,
           isNew: true,
           onSave: (updatedEntry) {
             setState(() {
@@ -365,7 +369,7 @@ class _EventScreenState extends State<EventScreen> {
                 Divider(),
                 const SizedBox(height: 24),
 
-                // --- DAY TYPE SELECTOR (Styling matched to Home Screen) ---
+                // --- DAY TYPE SELECTOR ---
                 InkWell(
                   onTap: _showDayTypeDialog,
                   borderRadius: BorderRadius.circular(16),
@@ -532,11 +536,13 @@ class SleepSessionEditor extends StatefulWidget {
   final SleepEntry initialEntry;
   final Function(SleepEntry) onSave;
   final bool isNew;
+  final DateTime referenceDate; // Added reference date for Noon-to-Noon logic
 
   const SleepSessionEditor({
     super.key, 
     required this.initialEntry, 
     required this.onSave,
+    required this.referenceDate, // Required now
     this.isNew = false,
   });
 
@@ -547,7 +553,6 @@ class SleepSessionEditor extends StatefulWidget {
 enum _SleepHandle { none, bed, asleep, wake, out }
 
 class _SleepSessionEditorState extends State<SleepSessionEditor> {
-  // Step 1: Times, Step 2: Details
   int _currentStep = 1;
 
   late DateTime _bedTime;
@@ -565,8 +570,8 @@ class _SleepSessionEditorState extends State<SleepSessionEditor> {
   final TextEditingController _awakeMinsCtrl = TextEditingController();
 
   static const double _clockSize = 300.0;
-  static const double _outerPadding = 35.0; // Radius for Bed/Out
-  static const double _innerPadding = 65.0; // Radius for Asleep/Wake
+  static const double _outerPadding = 35.0; 
+  static const double _innerPadding = 65.0; 
 
   @override
   void initState() {
@@ -636,7 +641,7 @@ class _SleepSessionEditorState extends State<SleepSessionEditor> {
     }
   }
 
-  // --- INTERACTION LOGIC (IMPROVED) ---
+  // --- INTERACTION LOGIC (SMART NOON-TO-NOON) ---
 
   void _updateTimeFromTouch(Offset localPosition) {
     final Offset center = Offset(_clockSize / 2, _clockSize / 2);
@@ -644,14 +649,15 @@ class _SleepSessionEditorState extends State<SleepSessionEditor> {
     
     double angle = atan2(delta.dy, delta.dx);
     
+    // Convert angle to hours (0..24, 0 is Top)
     double normalizedAngle = angle + (pi / 2);
     if (normalizedAngle < 0) normalizedAngle += 2 * pi;
-    
     double totalHours = (normalizedAngle / (2 * pi)) * 24.0;
     
     int hour = totalHours.floor();
     int minute = ((totalHours - hour) * 60).round();
     
+    // Snap to 5 minutes
     int snap = 5;
     minute = (minute / snap).round() * snap;
     if (minute == 60) {
@@ -660,26 +666,23 @@ class _SleepSessionEditorState extends State<SleepSessionEditor> {
     }
     if (hour == 24) hour = 0;
 
-    setState(() {
-      DateTime updateDate(DateTime original) {
-        return DateTime(original.year, original.month, original.day, hour, minute);
-      }
+    // --- KEY FIX: Determine Date based on Hour ---
+    // If hour is 0..11 -> Today (widget.referenceDate)
+    // If hour is 12..23 -> Yesterday (widget.referenceDate - 1 day)
+    DateTime baseDate = widget.referenceDate;
+    if (hour >= 12) {
+       baseDate = baseDate.subtract(const Duration(days: 1));
+    }
+    
+    DateTime newDt = DateTime(baseDate.year, baseDate.month, baseDate.day, hour, minute);
 
+    setState(() {
       switch (_draggingHandle) {
-        case _SleepHandle.bed:
-          _bedTime = updateDate(_bedTime);
-          break;
-        case _SleepHandle.asleep:
-          _asleepTime = updateDate(_asleepTime);
-          break;
-        case _SleepHandle.wake:
-          _wakeTime = updateDate(_wakeTime);
-          break;
-        case _SleepHandle.out:
-          _outTime = updateDate(_outTime);
-          break;
-        case _SleepHandle.none:
-          break;
+        case _SleepHandle.bed: _bedTime = newDt; break;
+        case _SleepHandle.asleep: _asleepTime = newDt; break;
+        case _SleepHandle.wake: _wakeTime = newDt; break;
+        case _SleepHandle.out: _outTime = newDt; break;
+        case _SleepHandle.none: break;
       }
     });
   }
@@ -752,7 +755,7 @@ class _SleepSessionEditorState extends State<SleepSessionEditor> {
         (_draggingHandle == _SleepHandle.bed || _draggingHandle == _SleepHandle.out) ? _outerPadding : _innerPadding)
     ).distance;
 
-    if (distToHandle < 40.0) { // 40px hit area
+    if (distToHandle < 40.0) { 
       _updateTimeFromTouch(local);
     } else {
       _draggingHandle = _SleepHandle.none;
@@ -1050,7 +1053,7 @@ class SleepEditorPainter extends CustomPainter {
 
     // Ticks & Numbers
     final tickPaint = Paint()..color = isDark ? Colors.grey[700]! : Colors.grey[400]!..strokeWidth = 1;
-    final textPainter = TextPainter(textDirection: ui.TextDirection.ltr);
+    final textPainter = TextPainter(textDirection: ui.TextDirection.ltr); 
 
     for (int i = 0; i < 24; i += 2) {
       double angle = (i / 24.0) * 2 * pi - (pi / 2);
@@ -1125,13 +1128,12 @@ class SleepEditorPainter extends CustomPainter {
       final bool isActive = activeHandle == handleType;
       final double size = isActive ? 22.0 : 14.0; // Larger when active, easier to see
 
-      // Shadow
+      // Shadow - Using generic shadow instead of MaskFilter for compatibility if needed
+      // Or just a dark circle underneath
       canvas.drawCircle(
         pos, 
         size, 
-        Paint()
-          ..color = Colors.black26
-          ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 4)
+        Paint()..color = Colors.black26
       );
       
       // Handle - Dark Charcoal in Dark Mode
