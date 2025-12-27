@@ -10,6 +10,7 @@ import 'exercise_screen.dart';
 import 'notes_screen.dart';
 import 'category_management_screen.dart'; 
 
+
 class EventScreen extends StatefulWidget {
   final DateTime date;
   const EventScreen({super.key, required this.date});
