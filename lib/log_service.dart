@@ -420,7 +420,22 @@ This export contains your sleep tracking data in a structured folder format.
         } else if (headers.contains('Substance Type') && headers.contains('Amount')) {
           importCount = await _importSubstanceLog(rows);
         } else if (headers.contains('Exercise Type')) { // 'Duration Mins' might not be in some exports
-          importCount = await _importExerciseLog(rows);
+          importCount = await _importExerciseLog(rows);}
+          else if (headers.contains('iconName') && headers.contains('colorHex')) {
+           String fileName = file.uri.pathSegments.last.toLowerCase();
+           String? categoryType;
+           
+           if (fileName.contains('day_type')) categoryType = 'day_types';
+           else if (fileName.contains('sleep_location')) categoryType = 'sleep_locations';
+           else if (fileName.contains('medication_type')) categoryType = 'medication_types';
+           else if (fileName.contains('exercise_type')) categoryType = 'exercise_types';
+           else if (fileName.contains('substance_type')) categoryType = 'substance_types';
+           
+           if (categoryType != null) {
+              importCount = await _importUserCategories(rows, categoryType);
+           } else {
+              throw Exception("Could not determine category type from filename '${file.uri.pathSegments.last}'. Please use files like 'day_types.csv'.");
+           }
         } else {
           throw Exception("Unknown CSV format. Please import sleep_log.csv, medication_log.csv, etc.");
         }
@@ -452,6 +467,46 @@ This export contains your sleep tracking data in a structured folder format.
     if (val is int) return val;
     if (val is double) return val.toInt();
     return int.tryParse(val.toString().trim()) ?? 0;
+  }
+   Future<int> _importUserCategories(List<List<dynamic>> rows, String categoryType) async {
+    int count = 0;
+    List<Category> existing = await CategoryManager().getCategories(categoryType);
+    
+    // Skip header (i=1)
+    for (int i = 1; i < rows.length; i++) {
+      var row = rows[i];
+      if (row.length < 4) continue; // id, name, icon, color required
+      
+      try {
+        String id = row[0].toString().trim();
+        String name = row[1].toString().trim();
+        String iconName = row[2].toString().trim();
+        String colorHex = row[3].toString().trim();
+        int? defaultDosage;
+        if (row.length > 4 && row[4].toString().trim().isNotEmpty) {
+           defaultDosage = int.tryParse(row[4].toString().trim());
+        }
+
+        // Deduplicate by ID
+        if (!existing.any((c) => c.id == id)) {
+           existing.add(Category(
+             id: id,
+             name: name,
+             iconName: iconName,
+             colorHex: colorHex,
+             defaultDosage: defaultDosage
+           ));
+           count++;
+        }
+      } catch (e) {
+        debugPrint("Error importing category row $i: $e");
+      }
+    }
+    
+    if (count > 0) {
+      await CategoryManager().saveCategories(categoryType, existing);
+    }
+    return count;
   }
 
   Future<int> _importSleepLog(List<List<dynamic>> rows) async {
