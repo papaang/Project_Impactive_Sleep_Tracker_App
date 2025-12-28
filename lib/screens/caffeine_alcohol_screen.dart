@@ -189,7 +189,7 @@ class _CaffeineAlcoholScreenState extends State<CaffeineAlcoholScreen> {
 
     final int finalCount = result['count'];
     final DateTime finalTime = result['time'];
-    final String amountString = "$finalCount $unit${finalCount > 1 ? 's' : ''}";
+    final String amountString = "$finalCount";
 
     if (existingEntry != null && index != null) {
       // Update existing
@@ -277,14 +277,24 @@ class _CaffeineAlcoholScreenState extends State<CaffeineAlcoholScreen> {
                         SubstanceEntry item = entry.value;
                         final category = _substanceTypes.where((c) => c.id == item.substanceTypeId).firstOrNull;
                         final displayName = category?.name ?? item.name;
+                        String unit = category?.id == 'alcohol' ? 'drink' : 'cup';
                         
                         return Card(
                           margin: const EdgeInsets.symmetric(vertical: 6),
                           child: ListTile(
                             leading: Icon(category?.icon ?? Icons.local_drink,
                                 color: category?.color ?? Colors.brown),
-                            title: Text("$displayName: ${item.amount}",
-                                style: const TextStyle(fontWeight: FontWeight.bold)),
+                            title: RichText(
+                              text: TextSpan(
+                                style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).textTheme.bodyMedium?.color ?? Colors.black), 
+                                children: [
+                                  TextSpan(text: '$displayName: '), 
+                                  TextSpan(text: item.amount, style: int.tryParse(item.amount) == null ? TextStyle(color: Colors.red) : null), 
+                                  TextSpan(text: ' $unit'),
+                                  TextSpan(text: int.tryParse(item.amount) != null ? (int.tryParse(item.amount)! > 1 ? 's' : '') : '(s)')
+                                ]
+                              )
+                            ),
                             subtitle:
                                 Text(DateFormat('h:mm a').format(item.time)),
                             onTap: () => _editEntry(idx), // Added Tap to Edit
