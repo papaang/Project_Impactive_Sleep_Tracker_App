@@ -933,7 +933,7 @@ class _SquareButton extends StatelessWidget {
 
     final Color backgroundColor = isEnabled 
         ? (isDark ? const Color(0xFF1E1E1E) : Colors.white) 
-        : (isDark ? const Color(0xFF2C2C2C) : Colors.grey[100]!);
+        : (isDark ? const Color.fromARGB(255, 24, 24, 24) : Colors.grey[100]!);
     
     final Color iconBgColor = isEnabled 
         ? color.withOpacity(isDark ? 0.2 : 0.1) 
@@ -959,7 +959,7 @@ class _SquareButton extends StatelessWidget {
               color: isEnabled 
                   ? color.withOpacity(0.1) 
                   : Colors.transparent, 
-              width: 1
+              width: 3
             ),
           ),
           child: Column(

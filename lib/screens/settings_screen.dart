@@ -64,10 +64,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               // --- VERSION TAG ---
               Container(
                 alignment: Alignment.center,
-                child: Chip(
-                  label: const Text("Version 2.0"),
-                  backgroundColor: Colors.indigo.withOpacity(0.1),
-                  labelStyle: TextStyle(color: Colors.indigo[800], fontWeight: FontWeight.bold),
+                child: ValueListenableBuilder<ThemeMode>(
+                  valueListenable: themeNotifier,
+                  builder: (context, mode, child) {
+                    final isDark = mode == ThemeMode.dark;
+                    return Chip(
+                      label: const Text("Version 2.0"),
+                      backgroundColor: Colors.indigo.withOpacity(0.1),
+                      labelStyle: TextStyle(color: (isDark ? Colors.indigo[200] : Colors.indigo[800]), fontWeight: FontWeight.bold),
+                    );
+                  },
                 ),
               ),
               const SizedBox(height: 20),
