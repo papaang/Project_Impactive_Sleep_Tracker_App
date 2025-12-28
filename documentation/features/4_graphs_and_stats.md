@@ -9,7 +9,7 @@ The app provides several visualization tools to help users understand their slee
 This set of visualisations allows users to get data-driven insights about their sleep health and daily habits that can be shared with healthcare professionals. 
 
 > [!TIP]
-> For more advanced analysis, user data can be exported through the [log service](/documentation/features/data_management.md).
+> For more advanced analysis, user data can be exported through the [log service](/documentation/features/5_data_management.md).
 
 Visualizations available:
 - [Sleep Statistics (Bar Chart)](#sleep-statistics-bar-chart)
@@ -31,6 +31,16 @@ A basic bar chart view showing recent sleep performance:
 
 This provides a quick overview of recent sleep consistency and helps spot short-term trends in sleep duration.
 
+> [!NOTE]
+> Sleep duration for this visualisation is split across midnight (23:00-02:00 counts as 1h on the first day and 2h on the second day).
+
+<details>
+  <summary>"Sleep Statistics" (Bar Chart) screen</summary>
+  <div class="image-container">
+    <img src="../media/statistics.jpg" width="300">
+  </div>
+</details>
+
 ## Sleep Progress Graph (Diary)
 
 The Sleep Progress Graph provides a detailed timeline view of sleep patterns over multiple days, mimicking a paper sleep diary. Key features include:
@@ -48,6 +58,16 @@ The Sleep Progress Graph provides a detailed timeline view of sleep patterns ove
 
 This graph helps identify patterns in sleep timing, duration, and how daily activities affect sleep quality in a familiar format similar to a paper sleep diary.
 
+> [!TIP]
+> This visualisation may be more suited to a larger screen (tablet) rather than a mobile phone screen. Alternatively, [export](/documentation/features/5_data_management.md#data-export) log data to create your own visualisations on any device.
+
+<details>
+  <summary>"Sleep Progress Graph" (Sleep Diary) screen</summary>
+  <div class="image-container">
+    <img src="../media/sleep_progress_graph.jpg" width="300">
+  </div>
+</details>
+
 ## Circadian Drift (Mid-Sleep Point Trend)
 
 Tracks long-term changes in sleep timing:
@@ -61,9 +81,16 @@ Tracks long-term changes in sleep timing:
 
 This helps identify circadian rhythm shifts and jet lag effects.
 
+<details>
+  <summary>"Circadian Drift" screen</summary>
+  <div class="image-container">
+    <img src="../media/circadian_drift.jpg" width="300">
+  </div>
+</details>
+
 ## Sleep Consistency (Heatmap)
 
-A long-term overview of sleep duration over the past year using a heatmap (similar in format to a GitHub contributions heatmap):
+A long-term overview of sleep duration over the past year using a heatmap (similar in format to a [GitHub contributions heatmap](https://docs.github.com/en/account-and-profile/concepts/contributions-on-your-profile#contributions-calendar)):
 
 - **Calendar Grid**: 7x52 grid showing each day of the past year
 - **Color Intensity**: Sleep hours mapped to thermal gradient:
@@ -77,6 +104,13 @@ A long-term overview of sleep duration over the past year using a heatmap (simil
 - **Scrollable**: Horizontal scrolling starts from most recent data
 
 This provides a bird's-eye view of sleep duration consistency over long periods.
+
+<details>
+  <summary>"Sleep Consistency" screen</summary>
+  <div class="image-container">
+    <img src="../media/consistency.jpg" width="300">
+  </div>
+</details>
 
 ## Sleep Efficiency
 
@@ -95,19 +129,33 @@ Analyzes sleep quality by comparing time spent in bed versus actual sleep time:
 
 This helps identify nights with poor sleep efficiency and potential sleep disorders.
 
+<details>
+  <summary>"Sleep Efficiency" screen</summary>
+  <div class="image-container">
+    <img src="../media/efficiency.jpg" width="300">
+  </div>
+</details>
+
 ## Habits vs. Sleep Latency (Correlation Analysis)
 
 Explores how daily habits affect time to fall asleep:
 
 - **Scatter Plot**: Each point represents a habit occurrence and its impact on sleep latency
 - **Habit Types**:
-  - Brown circles: Caffeine (coffee, tea, cola, energy drinks)
-  - Purple circles: Alcohol (wine, beer, etc.)
+  - Brown circles: Caffeine
+  - Purple circles: Alcohol
   - Orange circles: Exercise
 - **Axes**:
-  - X-axis: Time of habit consumption (6:00 to 24:00)
+  - X-axis: Time of habit (relative, up to 16 hours before bed time)
   - Y-axis: Minutes to fall asleep (0-120 minutes)
 - **Data Window**: Analyzes past 60 days of data
 - **Cross-Day Analysis**: Considers habits from previous day that might affect sleep
 
 This may help users understand which habits most significantly delay sleep onset and optimize their evening routines.
+
+<details>
+  <summary>"Habits vs. Sleep Latency" (Correlation) screen</summary>
+  <div class="image-container">
+    <img src="../media/correlation.jpg" width="300">
+  </div>
+</details>

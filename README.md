@@ -13,6 +13,7 @@ This project will no longer actively be worked on from 19/01/2026, but can be us
 - [Contact](#contact)
 - [Licensing](#licensing)
 - [Contributors](#contributors)
+- [Screenshots](#screenshots)
 
 ## Key features
 1. **Sleep tracking** including bed/asleep/wake/rise times
@@ -21,7 +22,7 @@ This project will no longer actively be worked on from 19/01/2026, but can be us
 4. **Edit past entries** from the calendar view
 5. **Data import** and **export** capabilities
 
-For more details, please visit the [features documentation](documentation/features/).
+For more details, please visit the [features documentation](documentation/features/0_overview.md).
 
 ## Installation instructions
 Please follow the Android App instructions to use the sleep tracker app.
@@ -31,10 +32,6 @@ Please follow the Android App instructions to use the sleep tracker app.
 
 > [!NOTE]  
 > This app was designed and tested for Android. iOS and other platforms may have limited functionality.
-
-<!-- ## Video tutorial -->
-<!-- can be replaced with screenshots and text if easier, this is just to demo basic features for someone who is considering installing the app. or perhaps a tutorial/demo is unecessry if potential users read the documentation -->
-<!-- [Insert video tutorial here] -->
 
 ## Contact
 For queries, please contact [su.impactive@ucl.ac.uk](mailto:su.impactive@ucl.ac.uk)
@@ -53,4 +50,67 @@ Rozenn Raffaut ([@rozenn1](https://www.github.com/rozenn1)).
 
 With thanks to Elliot Samuel Shayle for project ideation, and for testing and feedback throughout app development.
 
-<!-- add links to socials if desired -->
+## Screenshots
+<a href="documentation/features/1_user_interface.md#home-screen">
+  <img
+    src="documentation/media/home_dark.jpg"
+    alt="Home screen in dark mode"
+    width="210"
+  >
+</a>
+<a href="documentation/features/2_sleep_tracking_and_editing.md">
+  <img
+    src="documentation/media/add_sleep_session_1.jpg"
+    alt="Adding a sleep session"
+    width="210"
+  >
+</a>
+<a href="documentation/features/3_events.md">
+  <img
+    src="documentation/media/events.jpg"
+    alt="Events screen"
+    width="210"
+  >
+</a>
+<a href="documentation/features/3_events.md#medication">
+  <img
+    src="documentation/media/add_medication.jpg"
+    alt="Adding medication"
+    width="210"
+  >
+</a>
+<a href="documentation/features/3_events.md#caffeine--alcohol">
+  <img
+    src="documentation/media/caffeine_alcohol.jpg"
+    alt="Caffeine and alcohol logging"
+    width="210"
+  >
+</a>
+<a href="documentation/features/4_graphs_and_stats.md#sleep-statistics-bar-chart">
+  <img
+    src="documentation/media/statistics.jpg"
+    alt="Statistics overview"
+    width="210"
+  >
+</a>
+<a href="documentation/features/4_graphs_and_stats.md#sleep-progress-graph-diary">
+  <img
+    src="documentation/media/sleep_progress_graph.jpg"
+    alt="Sleep progress graph"
+    width="210"
+  >
+</a>
+<a href="documentation/features/1_user_interface.md#settings-screen">
+  <img
+    src="documentation/media/settings.jpg"
+    alt="Settings screen"
+    width="210"
+  >
+</a>
+<a href="documentation/features/3_events.md#notification-service">
+  <img
+    src="documentation/media/notification.jpg"
+    alt="Notification settings"
+    width="210"
+  >
+</a>

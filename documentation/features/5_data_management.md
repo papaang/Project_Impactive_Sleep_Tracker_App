@@ -29,11 +29,11 @@ The app supports importing individual CSV files (e.g., sleep_log.csv, substance_
 <!-- Import automatically deduplicates entries to avoid duplicates. -->
 
 > [!NOTE]
-> Importing user categories from CSV is not currently implemented, but these can be edited from the [category management screen](/documentation/features/events.md#categories)
+> Importing user categories from CSV is not currently implemented, but these can be edited from the [category management screen](/documentation/features/3_events.md#categories)
 
 ## Privacy and Security
 
-All data is stored locally on the device. Export files can be encrypted or password-protected for secure sharing.
+All data is stored locally on the device. Users can choose to encrypt or password-protect their export files for secure sharing.
 
 ## Data Structure
 
@@ -106,3 +106,6 @@ All data is stored locally on the device. Export files can be encrypted or passw
 - Durations are in hours or minutes as specified.
 - Empty fields indicate no data or N/A.
 - Categories (day types, sleep locations, medication types, exercise types, substance types) are editable within the app.
+
+> [!TIP]
+> Users can export their sleep log data to a database management system and link it to health logs from other apps (e.g. step tracking or period tracking) using the "Date" column.
