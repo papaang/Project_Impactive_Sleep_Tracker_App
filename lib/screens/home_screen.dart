@@ -1178,14 +1178,14 @@ class SleepClockPainter extends CustomPainter {
        drawMarker(e.startTime, Colors.orange);
     }
 
-    // Shadow
-    canvas.drawCircle(
-      const Offset(0, 0), // using 0,0 since we are painting on a centered canvas
-      14, 
-      Paint()
-        ..color = Colors.black26
-        ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 4) 
-    );
+    // // Shadow
+    // canvas.drawCircle(
+    //   const Offset(0, 0), // using 0,0 since we are painting on a centered canvas
+    //   14, 
+    //   Paint()
+    //     ..color = Colors.black26
+    //     ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 4) 
+    // );
 
     canvas.restore(); 
   }
