@@ -132,7 +132,7 @@ The mobile notification allow easy access to
 - Quick Action: new Exercise entry
 
 > [!TIP]
-> Notifications can be turned off from the app's [settings page](/documentation/features/1_user_interface_md#settings-screen).
+> Notifications can be turned off from the app's [settings page](/documentation/features/1_user_interface.md#settings-screen).
 
 <details>
   <summary>Mobile notification</summary>

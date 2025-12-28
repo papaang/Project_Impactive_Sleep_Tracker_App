@@ -55,62 +55,62 @@ With thanks to Elliot Samuel Shayle for project ideation, and for testing and fe
   <img
     src="documentation/media/home_dark.jpg"
     alt="Home screen in dark mode"
-    width="210"
+    width="260"
   >
 </a>
 <a href="documentation/features/2_sleep_tracking_and_editing.md">
   <img
     src="documentation/media/add_sleep_session_1.jpg"
     alt="Adding a sleep session"
-    width="210"
+    width="260"
   >
 </a>
 <a href="documentation/features/3_events.md">
   <img
     src="documentation/media/events.jpg"
     alt="Events screen"
-    width="210"
+    width="260"
   >
 </a>
 <a href="documentation/features/3_events.md#medication">
   <img
     src="documentation/media/add_medication.jpg"
     alt="Adding medication"
-    width="210"
+    width="260"
   >
 </a>
 <a href="documentation/features/3_events.md#caffeine--alcohol">
   <img
     src="documentation/media/caffeine_alcohol.jpg"
     alt="Caffeine and alcohol logging"
-    width="210"
+    width="260"
   >
 </a>
 <a href="documentation/features/4_graphs_and_stats.md#sleep-statistics-bar-chart">
   <img
     src="documentation/media/statistics.jpg"
     alt="Statistics overview"
-    width="210"
+    width="260"
   >
 </a>
 <a href="documentation/features/4_graphs_and_stats.md#sleep-progress-graph-diary">
   <img
     src="documentation/media/sleep_progress_graph.jpg"
     alt="Sleep progress graph"
-    width="210"
+    width="260"
   >
 </a>
 <a href="documentation/features/1_user_interface.md#settings-screen">
   <img
     src="documentation/media/settings.jpg"
     alt="Settings screen"
-    width="210"
+    width="260"
   >
 </a>
 <a href="documentation/features/3_events.md#notification-service">
   <img
     src="documentation/media/notification.jpg"
     alt="Notification settings"
-    width="210"
+    width="260"
   >
 </a>

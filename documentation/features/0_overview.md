@@ -20,10 +20,10 @@ Built with Flutter for potential cross-platform compatibility, but primarily tes
 
 ## Documentation Contents
 
-1. **[User Interface](1_user_interface_md)**
-   - [Home Screen](1_user_interface_md#home-screen)
-   - [Navigation to Events Screen](1_user_interface_md#navigation-to-events-screen)
-   - [Settings Screen](1_user_interface_md#settings-screen)
+1. **[User Interface](1_user_interface.md)**
+   - [Home Screen](1_user_interface.md#home-screen)
+   - [Navigation to Events Screen](1_user_interface.md#navigation-to-events-screen)
+   - [Settings Screen](1_user_interface.md#settings-screen)
 
 2. **[Sleep Tracking and Editing](2_sleep_tracking_and_editing.md)**
    - [Sleep Tracking](2_sleep_tracking_and_editing.md#sleep-tracking)

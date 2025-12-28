@@ -13,7 +13,7 @@ Users can log four key time points for each sleep session:
 
 Additionally, the user can add the **number of awakenings** and **estimated total time awake** for these. This is useful for a user who has many awakenings per night but does not keep track of exactly when they occur.
 
-See user interface details [here](/documentation/features/1_user_interface_md#home-screen).
+See user interface details [here](/documentation/features/1_user_interface.md#home-screen).
 
 This detailed tracking helps calculate sleep duration, sleep efficiency, and identify patterns in sleep cycles.
 
