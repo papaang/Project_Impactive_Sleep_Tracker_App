@@ -1169,9 +1169,13 @@ class SleepClockPainter extends CustomPainter {
     for (var m in dailyLog.medicationLog) {
        drawMarker(m.time, Colors.green);
     }
-    // Caffeine/Substance (Brown)
+    // Substances (Caffeine: Brown, Alcohol: Purple)
     for (var s in dailyLog.substanceLog) {
-       drawMarker(s.time, Colors.brown);
+       if (s.substanceTypeId == 'caffeine') {
+         drawMarker(s.time, Colors.brown);
+       } else if (s.substanceTypeId == 'alcohol') {
+         drawMarker(s.time, Colors.purple);
+       }
     }
     // Exercise (Orange)
     for (var e in dailyLog.exerciseLog) {
