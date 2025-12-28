@@ -604,6 +604,7 @@ This export contains your sleep tracking data in a structured folder format.
     int count = 0;
     for (int i = 1; i < rows.length; i++) {
       var row = rows[i];
+      if (row.length < 4) continue;
       try {
         DateTime date = DateTime.parse(row[0].toString().trim());
         DateTime utcDate = DateTime.utc(date.year, date.month, date.day);
@@ -616,14 +617,19 @@ This export contains your sleep tracking data in a structured folder format.
         DateTime end = DateTime(date.year, date.month, date.day, int.parse(endP[0]), int.parse(endP[1]));
         if (end.isBefore(start)) end = end.add(const Duration(days: 1));
 
+        int csvDuration = -1;
+        if (row.length > 4 && row[4] != null) {
+           csvDuration = int.tryParse(row[4].toString().trim()) ?? 0;
+        }
+
         DailyLog log = await getDailyLog(utcDate);
 
         bool exists = log.exerciseLog.any((e) => 
-           e.exerciseTypeId == exType && 
+           e.exerciseTypeId.toLowerCase() == exType.toLowerCase() && 
            _isSameMinute(e.startTime, start) &&
-           _isSameMinute(e.finishTime, end)
+           _isSameMinute(e.finishTime, end) &&
+           e.finishTime.difference(e.startTime).inMinutes == end.difference(start).inMinutes
         );
-
         if (!exists) {
           log.exerciseLog.add(ExerciseEntry(
             exerciseTypeId: exType, 
