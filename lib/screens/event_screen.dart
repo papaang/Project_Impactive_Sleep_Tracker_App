@@ -226,6 +226,22 @@ class _EventScreenState extends State<EventScreen> {
     }
   }
 
+  Future<void> _resetDayType() async {
+    setState(() {
+      _log.dayTypeId = null;
+    });
+    await _logService.saveDailyLog(widget.date, _log);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Day type reset'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   Future<void> _editSleepEntry(int index, SleepEntry entry) async {
     await showDialog(
       context: context,
@@ -373,6 +389,7 @@ class _EventScreenState extends State<EventScreen> {
                 // --- DAY TYPE SELECTOR ---
                 InkWell(
                   onTap: _showDayTypeDialog,
+                  onLongPress: _resetDayType,
                   borderRadius: BorderRadius.circular(16),
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
