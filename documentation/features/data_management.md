@@ -9,21 +9,27 @@ The data management features allow users to import, export, and manage their sle
 
 ## Data Export
 
-Users can export their sleep data in a structured format for:
+Users can export their sleep data as a ZIP file containing multiple CSV files and a README for:
 
 - Backup purposes
 - External analysis in tools like Excel, R, SQL, or PowerBI
 - Sharing with healthcare providers
 - Archiving historical data
 
+The export includes a timestamped ZIP file that can be shared directly from the app.
+
 ## Data Import
 
-The app supports importing previously exported data, enabling:
+The app supports importing individual CSV files (e.g., sleep_log.csv, substance_log.csv, medication_log.csv, exercise_log.csv), enabling:
 
 - Restoring from backups
 - Migrating data between devices
 - Combining data from multiple sources
 
+<!-- Import automatically deduplicates entries to avoid duplicates. -->
+
+> [!NOTE]
+> Importing user categories from CSV is not currently implemented, but these can be edited from the [category management screen](/documentation/features/events.md#categories)
 
 ## Privacy and Security
 
@@ -76,7 +82,7 @@ All data is stored locally on the device. Export files can be encrypted or passw
 
 #### substance_log.csv
 - **Date**: The date of the substance entry in YYYY-MM-DD format.
-- **Substance Type**: The type of substance (e.g., coffee, tea, cola, alcohol).
+- **Substance Type**: The type of substance (e.g., caffeine, alcohol).
 - **Amount**: The amount consumed (number of cups).
 - **Time**: The time the substance was consumed, in HH:mm format.
 
@@ -99,4 +105,4 @@ All data is stored locally on the device. Export files can be encrypted or passw
 - Dates are in YYYY-MM-DD format. Please use dates to link files for database analysis.
 - Durations are in hours or minutes as specified.
 - Empty fields indicate no data or N/A.
-- exercise_types and substance_types are not editable in this version of the app.
+- Categories (day types, sleep locations, medication types, exercise types, substance types) are editable within the app.

@@ -18,6 +18,9 @@ The home screen is the main entry point of the app and provides an overview of t
 
 - **Status Card**: Shows the current sleep status message (e.g., "Welcome! Tap 'Going to sleep' to start." or sleep duration summary). Includes a visual sleep clock when sleep data is available, displaying past sleep sessions as arcs and current sleep progress.
 
+> [!TIP]
+> Click on the clock face visualisation to go to [today's events screen](/documentation/features/events.md)
+
 - **Sleep Controls**: Two large buttons for sleep management:
   - "Wake Up" and "Sleep" buttons when not in bed
   - "Got Out of Bed" button when awake in bed

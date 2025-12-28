@@ -85,7 +85,7 @@ The mobile notification allow easy access to
 - Quick Action: new Exercise entry
 
 > [!TIP]
-> To turn off the notification, block notifications from the settings.
+> Notifications can be turned off from the app's settings page.
 
 ## Categories
 
@@ -94,7 +94,7 @@ The app uses dynamic categories to organize different types of data, with defaul
 - **Day Types**: Work, Relax, Travel, Social
 - **Sleep Locations**: Bed, Couch, In Transit
 - **Medication Types**: Melatonin, Daridorexant, Sertraline, etc.
-- *Exercise Types*: Light, Medium, Heavy
-- *Substance Types*: Coffee, Alcohol
+- **Exercise Types**: Light, Medium, Heavy
+- **Substance Types**: Coffee, Alcohol
 
-**Day Types**, **Sleep Locations**, and **Medication Types** (and dosages) are editable from the category manageent screen in the app settings. Users can assign an icon and color to each category to help distinguish them.
+Categories are editable from the category management screen in the app settings. Users can assign an icon and color to each category to help distinguish them.

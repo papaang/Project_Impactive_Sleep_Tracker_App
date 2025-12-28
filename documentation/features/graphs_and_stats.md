@@ -11,16 +11,13 @@ This set of visualisations allows users to get data-driven insights about their 
 > [!TIP]
 > For more advanced analysis, user data can be exported through the [log service](/documentation/features/data_management.md).
 
-- Visualizations
-  - [Sleep Statistics (Bar Chart)](#sleep-statistics-bar-chart)
-  - [Sleep Progress Graph (Diary)](#sleep-progress-graph-diary)
-  - [Circadian Drift (Mid-Sleep Point Trend)](#circadian-drift-mid-sleep-point-trend)
-  - [Sleep Consistency (Heatmap)](#sleep-consistency-heatmap)
-  - [Sleep Efficiency](#sleep-efficiency)
-  - [Habits vs. Sleep Latency (Correlation Analysis)](#habits-vs-sleep-latency-correlation-analysis)
-- Implementation
-  - [Technical Implementation](#technical-implementation)
-  - [Data Sources](#data-sources)
+Visualizations available:
+- [Sleep Statistics (Bar Chart)](#sleep-statistics-bar-chart)
+- [Sleep Progress Graph (Diary)](#sleep-progress-graph-diary)
+- [Circadian Drift (Mid-Sleep Point Trend)](#circadian-drift-mid-sleep-point-trend)
+- [Sleep Consistency (Heatmap)](#sleep-consistency-heatmap)
+- [Sleep Efficiency](#sleep-efficiency)
+- [Habits vs. Sleep Latency (Correlation Analysis)](#habits-vs-sleep-latency-correlation-analysis)
 
 
 ## Sleep Statistics (Bar Chart)
@@ -114,21 +111,3 @@ Explores how daily habits affect time to fall asleep:
 - **Cross-Day Analysis**: Considers habits from previous day that might affect sleep
 
 This may help users understand which habits most significantly delay sleep onset and optimize their evening routines.
-
-## Technical Implementation
-
-All graphs are built using Flutter's CustomPaint for high-performance rendering:
-
-- **Dynamic Scaling**: Graphs adapt to screen size and data ranges
-- **Dark Mode Support**: Automatic color adjustments for light/dark themes
-- **Efficient Data Loading**: Loads only necessary data periods to maintain performance
-- **Interactive Elements**: Touch gestures for data label tooltips
-
-## Data Sources
-
-Graphs pull data from the app's log service, including:
-
-- Sleep entries (bed time, asleep time, wake time, awake duration)
-- Substance logs (caffeine, alcohol, medication)
-- Exercise logs (timing and duration)
-- Day type categories for contextual markers
