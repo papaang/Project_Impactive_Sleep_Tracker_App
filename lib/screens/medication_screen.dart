@@ -129,17 +129,19 @@ class _MedicationScreenState extends State<MedicationScreen> {
   Future<void> _showDosageDialog(Category selectedType, {MedicationEntry? existingEntry, int? index}) async {
     String? dosage;
     Category currentDialogType = selectedType;
-    
+    DateTime selectedTime = existingEntry?.time ?? DateTime.now();
+
     // Check if we should show the dialog (editing OR no default dosage)
     bool showDialogInput = existingEntry != null || selectedType.defaultDosage == null;
 
     if (showDialogInput) {
       String initialDosage = existingEntry?.dosage ?? '';
-      
+
       final result = await showDialog<Map<String, dynamic>>(
           context: context,
           builder: (context) {
               final controller = TextEditingController(text: initialDosage);
+              DateTime tempTime = selectedTime;
               return StatefulBuilder(
                 builder: (context, setStateDialog) {
                   return AlertDialog(
@@ -179,6 +181,39 @@ class _MedicationScreenState extends State<MedicationScreen> {
                                 autofocus: existingEntry == null && controller.text.isEmpty,
                                 decoration: const InputDecoration(labelText: 'Dosage (mg/pill)', hintText: 'e.g. 5 or 10'),
                             ),
+                            const SizedBox(height: 16),
+                            ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text("Time:"),
+                              trailing: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: Colors.grey),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  DateFormat('h:mm a').format(tempTime),
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                              onTap: () async {
+                                final TimeOfDay? picked = await showTimePicker(
+                                  context: context,
+                                  initialTime: TimeOfDay.fromDateTime(tempTime),
+                                );
+                                if (picked != null) {
+                                  setStateDialog(() {
+                                    tempTime = DateTime(
+                                      widget.date.year,
+                                      widget.date.month,
+                                      widget.date.day,
+                                      picked.hour,
+                                      picked.minute,
+                                    );
+                                  });
+                                }
+                              },
+                            ),
                           ],
                         ),
                       ),
@@ -187,8 +222,9 @@ class _MedicationScreenState extends State<MedicationScreen> {
                           TextButton(
                             onPressed: () => Navigator.pop(context, {
                               'dosage': controller.text,
-                              'type': currentDialogType
-                            }), 
+                              'type': currentDialogType,
+                              'time': tempTime
+                            }),
                             child: const Text('OK')
                           ),
                       ],
@@ -197,39 +233,23 @@ class _MedicationScreenState extends State<MedicationScreen> {
               );
           }
       );
-      
-      if (result == null) return; 
+
+      if (result == null) return;
       dosage = result['dosage'];
       currentDialogType = result['type'];
+      selectedTime = result['time'];
     } else {
       dosage = selectedType.defaultDosage.toString();
     }
 
     if (dosage == null) return;
 
-    DateTime initialTime = existingEntry?.time ?? DateTime.now();
-
-    final TimeOfDay? time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(initialTime),
-      helpText: 'Time taken',
-    );
-    if (time == null) return;
-
-    final DateTime entryTime = DateTime(
-      widget.date.year,
-      widget.date.month,
-      widget.date.day,
-      time.hour,
-      time.minute,
-    );
-    
     final newEntry = MedicationEntry(
-      medicationTypeId: currentDialogType.id, 
-      dosage: dosage!.isEmpty ? "Standard" : dosage!, 
-      time: entryTime
+      medicationTypeId: currentDialogType.id,
+      dosage: dosage!.isEmpty ? "Standard" : dosage!,
+      time: selectedTime
     );
-    
+
     setState(() {
       if (index != null) {
         _log.medicationLog[index] = newEntry;
