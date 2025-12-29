@@ -5,7 +5,7 @@
     <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
-        android:label="sleep_draft_three"
+        android:label="Impactive Sleep Tracker"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
