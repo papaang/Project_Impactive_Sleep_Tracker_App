@@ -1,8 +1,6 @@
-import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../models.dart';
 import '../log_service.dart';
 
 class SleepHeatmapScreen extends StatefulWidget {

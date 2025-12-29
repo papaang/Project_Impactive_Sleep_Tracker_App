@@ -50,15 +50,6 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     await _logService.saveDailyLog(widget.date, _log);
   }
 
-  Future<TimeOfDay?> _showTimePicker(TimeOfDay initialTime,
-      {required String helpText}) async {
-    return await showTimePicker(
-      context: context,
-      initialTime: initialTime,
-      helpText: helpText,
-    );
-  }
-
   Future<void> _addExerciseEntry() async {
     // 1. Select Type
     final Category? selectedType = await showDialog<Category>(
@@ -110,7 +101,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
                     DropdownButtonFormField<String>(
                       isExpanded: true,
                       decoration: const InputDecoration(labelText: 'Activity Type'),
-                      value: _exerciseTypes.any((c) => c.id == currentDialogType.id) ? currentDialogType.id : null,
+                      initialValue: _exerciseTypes.any((c) => c.id == currentDialogType.id) ? currentDialogType.id : null,
                       items: _exerciseTypes.map((cat) {
                         return DropdownMenuItem(
                           value: cat.id,

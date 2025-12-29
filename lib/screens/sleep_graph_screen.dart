@@ -113,7 +113,7 @@ class _SleepGraphScreenState extends State<SleepGraphScreen> {
                           return Container(
                             height: _rowHeight,
                             decoration: BoxDecoration(
-                              border: Border(bottom: BorderSide(color: Colors.grey.withOpacity(0.2))),
+                              border: Border(bottom: BorderSide(color: Colors.grey.withAlpha(51))),
                             ),
                             child: Row(
                               children: [
@@ -191,7 +191,7 @@ class _SleepGraphScreenState extends State<SleepGraphScreen> {
                               return Container(
                                 height: _rowHeight,
                                 decoration: BoxDecoration(
-                                  border: Border(bottom: BorderSide(color: Colors.grey.withOpacity(0.2))),
+                                  border: Border(bottom: BorderSide(color: Colors.grey.withAlpha(51))),
                                 ),
                                 child: CustomPaint(
                                   painter: GraphRowPainter(
@@ -230,7 +230,7 @@ class GraphHeaderPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final textPainter = TextPainter(textDirection: ui.TextDirection.ltr, textAlign: TextAlign.center);
-    final linePaint = Paint()..color = Colors.grey.withOpacity(0.3)..strokeWidth = 1;
+    final linePaint = Paint()..color = Colors.grey.withAlpha(77)..strokeWidth = 1;
 
     // Grid runs 00:00 to 24:00 (Midnight to Midnight)
     for (int i = 0; i <= 24; i++) {
@@ -240,7 +240,7 @@ class GraphHeaderPainter extends CustomPainter {
       // Let's do every 3 hours: 00, 03, ... 21, 24
       if (i % 3 == 0) {
         // Special case for last label 24 -> 24 is clear for end of day.
-        String label = "${i.toString().padLeft(2, '0')}";
+        String label = i.toString().padLeft(2, '0');
         if (i == 24) label = "24"; 
         
         textPainter.text = TextSpan(
@@ -285,7 +285,6 @@ class GraphRowPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final gridPaint = Paint()..color = isDark ? Colors.white10 : Colors.black12..strokeWidth = 1;
     final boxPaint = Paint()..style = PaintingStyle.stroke..strokeWidth = 1..color = isDark ? Colors.white24 : Colors.black26;
 
     // 1. Draw Hour Boxes (0 to 24)
@@ -295,7 +294,7 @@ class GraphRowPainter extends CustomPainter {
     }
 
     // 2. Draw Events from ALL logs
-    final sleepFillPaint = Paint()..style = PaintingStyle.fill..color = isDark ? Colors.indigoAccent.withOpacity(0.5) : Colors.indigo.withOpacity(0.3);
+    final sleepFillPaint = Paint()..style = PaintingStyle.fill..color = isDark ? Colors.indigoAccent.withAlpha(128) : Colors.indigo.withAlpha(77);
     final bedLinePaint = Paint()..style = PaintingStyle.stroke..strokeWidth = 3..color = isDark ? Colors.tealAccent : Colors.teal[700]!;
     
     // List to collect all symbols before drawing

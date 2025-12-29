@@ -81,7 +81,7 @@ class _MedicationScreenState extends State<MedicationScreen> {
     );
 
     if (name != null && name.trim().isNotEmpty) {
-      final String safeId = name.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '_') + '_${DateTime.now().millisecondsSinceEpoch}';
+      final String safeId = '${name.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '_')}_${DateTime.now().millisecondsSinceEpoch}';
       final newCategory = Category(
         id: safeId,
         name: name.trim(),
@@ -153,7 +153,7 @@ class _MedicationScreenState extends State<MedicationScreen> {
                             DropdownButtonFormField<String>(
                               isExpanded: true,
                               decoration: const InputDecoration(labelText: 'Medication'),
-                              value: _medicationTypes.any((c) => c.id == currentDialogType.id) ? currentDialogType.id : null,
+                              initialValue: _medicationTypes.any((c) => c.id == currentDialogType.id) ? currentDialogType.id : null,
                               items: _medicationTypes.map((cat) {
                                 return DropdownMenuItem(
                                   value: cat.id,
@@ -246,7 +246,7 @@ class _MedicationScreenState extends State<MedicationScreen> {
 
     final newEntry = MedicationEntry(
       medicationTypeId: currentDialogType.id,
-      dosage: dosage!.isEmpty ? "Standard" : dosage!,
+      dosage: dosage.isEmpty ? "Standard" : dosage,
       time: selectedTime
     );
 
@@ -428,7 +428,7 @@ class _MedicationScreenState extends State<MedicationScreen> {
                           margin: const EdgeInsets.symmetric(vertical: 6),
                           child: ListTile(
                             leading: CircleAvatar(
-                              backgroundColor: (category?.color ?? Colors.green).withOpacity(0.1),
+                              backgroundColor: (category?.color ?? Colors.green).withAlpha(25),
                               child: Icon(category?.icon ?? Icons.medication_outlined, color: category?.color ?? Colors.green[800]),
                             ),
                             title: Text(displayName, style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -486,7 +486,7 @@ class _MedicationTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: isOutline ? Colors.transparent : color.withOpacity(0.1),
+      color: isOutline ? Colors.transparent : color.withAlpha(25),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: isOutline ? BorderSide(color: color, width: 1.5) : BorderSide.none,
@@ -520,7 +520,7 @@ class _MedicationTile extends StatelessWidget {
                             Text(
                               dosage!,
                               style: TextStyle(
-                                color: isOutline ? color : Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                                color: isOutline ? color : Theme.of(context).colorScheme.onSurface.withAlpha(179),
                                 fontWeight: FontWeight.normal,
                                 fontSize: 12,
                               ),

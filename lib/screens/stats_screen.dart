@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../log_service.dart';
-import '../models.dart';
 
 class StatsScreen extends StatefulWidget {
   const StatsScreen({super.key});

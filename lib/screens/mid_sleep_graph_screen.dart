@@ -100,9 +100,9 @@ class _MidSleepGraphScreenState extends State<MidSleepGraphScreen> {
                   Expanded(
                     child: Container(
                       decoration: BoxDecoration(
-                        color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[100],
+                        color: isDark ? Colors.white.withAlpha(13) : Colors.grey[100],
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.grey.withOpacity(0.2))
+                        border: Border.all(color: Colors.grey.withAlpha(51))
                       ),
                       padding: const EdgeInsets.all(16),
                       child: LayoutBuilder(
@@ -217,7 +217,7 @@ class DriftGraphPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
     
     final paintGrid = Paint()
-      ..color = Colors.grey.withOpacity(0.2)
+      ..color = Colors.grey.withAlpha(51)
       ..strokeWidth = 1;
 
     final textPainter = TextPainter(textDirection: ui.TextDirection.ltr);
@@ -264,8 +264,11 @@ class DriftGraphPainter extends CustomPainter {
       double y = graphH - ((val - minH) / (maxH - minH)) * graphH;
       
       points.add(Offset(x, y));
-      if (i == 0) path.moveTo(x, y);
-      else path.lineTo(x, y);
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
       
       // Draw Date Labels
       textPainter.text = TextSpan(

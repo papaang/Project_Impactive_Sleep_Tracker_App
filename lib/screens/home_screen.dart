@@ -103,10 +103,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     
     if (!isSameDay(_loadedDate, today)) {
       if (!_todayLog.isSleeping && !_todayLog.isAwakeInBed) {
-        print("Day changed, reloading for today.");
+        // print("Day changed, reloading for today.");
         _loadTodayLog();
       } else {
-        print("Day changed, but keeping yesterday loaded to finish sleep.");
+        // print("Day changed, but keeping yesterday loaded to finish sleep.");
       }
     }
   }
@@ -313,9 +313,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final today = DateTime(now.year, now.month, now.day);
     
     if (!isSameDay(_loadedDate, today)) {
-       print("Sleep cycle finished for yesterday. Switching to today.");
-       await Future.delayed(Duration(milliseconds: 500));
-       _loadTodayLog(); 
+      // print("Sleep cycle finished for yesterday. Switching to today.");
+      await Future.delayed(Duration(milliseconds: 500));
+      _loadTodayLog(); 
     }
   }
 
@@ -469,7 +469,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
         if (newName != null && newName.trim().isNotEmpty) {
           final String name = newName.trim();
-          final String id = name.toLowerCase().replaceAll(RegExp(r'\s+'), '_') + '_${DateTime.now().millisecondsSinceEpoch}';
+          final String id = '${name.toLowerCase().replaceAll(RegExp(r'\s+'), '_')}_${DateTime.now().millisecondsSinceEpoch}';
           
           final newCategory = Category(
             id: id,
@@ -697,7 +697,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       child: Container(
                         padding: EdgeInsets.symmetric(vertical: 16, horizontal: 20),
                         decoration: BoxDecoration(
-                          color: currentDayType?.color.withOpacity(0.1) ?? (isDark ? Colors.grey[800] : Colors.grey[200]),
+                          color: currentDayType?.color.withAlpha(25) ?? (isDark ? Colors.grey[800] : Colors.grey[200]),
                           border: Border.all(
                             color: currentDayType?.color ?? (isDark ? Colors.grey[700]! : Colors.grey[400]!),
                             width: 1.5,
@@ -940,7 +940,7 @@ class _SquareButton extends StatelessWidget {
         : (isDark ? const Color.fromARGB(255, 24, 24, 24) : Colors.grey[100]!);
     
     final Color iconBgColor = isEnabled 
-        ? color.withOpacity(isDark ? 0.2 : 0.1) 
+        ? color.withAlpha(isDark ? 51 : 26) 
         : (isDark ? Colors.grey[800]! : Colors.grey[200]!);
 
     final Color textColor = isEnabled
@@ -961,7 +961,7 @@ class _SquareButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
               color: isEnabled 
-                  ? color.withOpacity(0.1) 
+                  ? color.withAlpha(25) 
                   : Colors.transparent, 
               width: 3
             ),
@@ -1119,7 +1119,7 @@ class SleepClockPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.butt 
       ..strokeWidth = 12.0
-      ..color = Colors.indigo.withOpacity(isDark ? 0.6 : 0.5); // Solid color
+      ..color = Colors.indigo.withAlpha(isDark ? 153 : 128); // Solid color
 
     for (var entry in dailyLog.sleepLog) {
       double startHour = entry.bedTime.hour + entry.bedTime.minute / 60.0;

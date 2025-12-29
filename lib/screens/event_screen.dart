@@ -200,7 +200,7 @@ class _EventScreenState extends State<EventScreen> {
 
         if (newName != null && newName.trim().isNotEmpty) {
           final String name = newName.trim();
-          final String id = name.toLowerCase().replaceAll(RegExp(r'\s+'), '_') + '_${DateTime.now().millisecondsSinceEpoch}';
+          final String id = '${name.toLowerCase().replaceAll(RegExp(r'\s+'), '_')}_${DateTime.now().millisecondsSinceEpoch}';
           
           final newCategory = Category(
             id: id,
@@ -263,7 +263,6 @@ class _EventScreenState extends State<EventScreen> {
   }
 
   Future<void> _addSleepEntry() async {
-    final now = DateTime.now();
     final defaultBed = DateTime(widget.date.year, widget.date.month, widget.date.day, 23, 0).subtract(Duration(days: 1));
     final defaultAsleep = defaultBed.add(Duration(minutes: 30));
     final defaultWake = defaultBed.add(Duration(hours: 8, minutes: 30));
@@ -394,7 +393,7 @@ class _EventScreenState extends State<EventScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
                     decoration: BoxDecoration(
-                      color: currentDayType?.color.withOpacity(0.1) ?? (isDark ? Colors.grey[800] : Colors.grey[200]),
+                      color: currentDayType?.color.withAlpha(25) ?? (isDark ? Colors.grey[800] : Colors.grey[200]),
                       border: Border.all(
                         color: currentDayType?.color ?? (isDark ? Colors.grey[700]! : Colors.grey[400]!),
                         width: 1.5,
@@ -568,7 +567,7 @@ class SleepSessionEditor extends StatefulWidget {
   State<SleepSessionEditor> createState() => _SleepSessionEditorState();
 }
 
-enum _SleepHandle { none, bed, asleep, wake, out }
+enum SleepHandle { none, bed, asleep, wake, out }
 
 class _SleepSessionEditorState extends State<SleepSessionEditor> {
   int _currentStep = 1;
@@ -582,7 +581,7 @@ class _SleepSessionEditorState extends State<SleepSessionEditor> {
   late String _locationId;
   List<Category> _sleepLocations = [];
 
-  _SleepHandle _draggingHandle = _SleepHandle.none;
+  SleepHandle _draggingHandle = SleepHandle.none;
 
   final TextEditingController _awakeningsCtrl = TextEditingController();
   final TextEditingController _awakeMinsCtrl = TextEditingController();
@@ -696,11 +695,11 @@ class _SleepSessionEditorState extends State<SleepSessionEditor> {
 
     setState(() {
       switch (_draggingHandle) {
-        case _SleepHandle.bed: _bedTime = newDt; break;
-        case _SleepHandle.asleep: _asleepTime = newDt; break;
-        case _SleepHandle.wake: _wakeTime = newDt; break;
-        case _SleepHandle.out: _outTime = newDt; break;
-        case _SleepHandle.none: break;
+        case SleepHandle.bed: _bedTime = newDt; break;
+        case SleepHandle.asleep: _asleepTime = newDt; break;
+        case SleepHandle.wake: _wakeTime = newDt; break;
+        case SleepHandle.out: _outTime = newDt; break;
+        case SleepHandle.none: break;
       }
     });
   }
@@ -730,23 +729,23 @@ class _SleepSessionEditorState extends State<SleepSessionEditor> {
         return diff;
     }
 
-    _draggingHandle = _SleepHandle.none;
+    _draggingHandle = SleepHandle.none;
 
     if (touchRadius > midRadius) {
        double distBed = getAngularDist(_bedTime);
        double distOut = getAngularDist(_outTime);
        if (distBed <= distOut) {
-         _draggingHandle = _SleepHandle.bed;
+         _draggingHandle = SleepHandle.bed;
        } else {
-         _draggingHandle = _SleepHandle.out;
+         _draggingHandle = SleepHandle.out;
        }
     } else {
        double distAsleep = getAngularDist(_asleepTime);
        double distWake = getAngularDist(_wakeTime);
        if (distAsleep <= distWake) {
-         _draggingHandle = _SleepHandle.asleep;
+         _draggingHandle = SleepHandle.asleep;
        } else {
-         _draggingHandle = _SleepHandle.wake;
+         _draggingHandle = SleepHandle.wake;
        }
     }
 
@@ -758,35 +757,33 @@ class _SleepSessionEditorState extends State<SleepSessionEditor> {
       return Offset(center.dx + r * cos(angle), center.dy + r * sin(angle));
     }
     
-    double targetR = (_draggingHandle == _SleepHandle.bed || _draggingHandle == _SleepHandle.out) 
-        ? outerRingR : innerRingR;
     DateTime targetTime;
     switch(_draggingHandle) {
-        case _SleepHandle.bed: targetTime = _bedTime; break;
-        case _SleepHandle.out: targetTime = _outTime; break;
-        case _SleepHandle.asleep: targetTime = _asleepTime; break;
-        case _SleepHandle.wake: targetTime = _wakeTime; break;
+        case SleepHandle.bed: targetTime = _bedTime; break;
+        case SleepHandle.out: targetTime = _outTime; break;
+        case SleepHandle.asleep: targetTime = _asleepTime; break;
+        case SleepHandle.wake: targetTime = _wakeTime; break;
         default: targetTime = DateTime.now();
     }
     
     double distToHandle = (local - getHandlePos(targetTime, 
-        (_draggingHandle == _SleepHandle.bed || _draggingHandle == _SleepHandle.out) ? _outerPadding : _innerPadding)
+        (_draggingHandle == SleepHandle.bed || _draggingHandle == SleepHandle.out) ? _outerPadding : _innerPadding)
     ).distance;
 
     if (distToHandle < 40.0) { 
       _updateTimeFromTouch(local);
     } else {
-      _draggingHandle = _SleepHandle.none;
+      _draggingHandle = SleepHandle.none;
     }
   }
 
   void _onPanUpdate(DragUpdateDetails details) {
-    if (_draggingHandle == _SleepHandle.none) return;
+    if (_draggingHandle == SleepHandle.none) return;
     _updateTimeFromTouch(details.localPosition);
   }
 
   void _onPanEnd(DragEndDetails details) {
-    _draggingHandle = _SleepHandle.none;
+    _draggingHandle = SleepHandle.none;
     setState(() {}); // Redraw to remove highlight
   }
 
@@ -907,7 +904,7 @@ class _SleepSessionEditorState extends State<SleepSessionEditor> {
 
           if (_sleepLocations.isNotEmpty)
             DropdownButtonFormField<String>(
-              value: _locationId,
+              initialValue: _locationId,
               dropdownColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
               decoration: const InputDecoration(
                 labelText: "Sleep Location",
@@ -1014,9 +1011,9 @@ class _TimeTile extends StatelessWidget {
         width: 100,
         padding: EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: color.withOpacity(isDark ? 0.25 : 0.1),
+          color: color.withAlpha(isDark ? 64 : 26),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(isDark ? 0.5 : 0.3))
+          border: Border.all(color: color.withAlpha(isDark ? 51 : 77))
         ),
         child: Column(
           children: [
@@ -1046,11 +1043,11 @@ class SleepEditorPainter extends CustomPainter {
   final double outerPadding;
   final double innerPadding;
   final bool isDark;
-  final _SleepHandle activeHandle; // New parameter
+  final SleepHandle activeHandle; // New parameter
 
   SleepEditorPainter(
     this.bedTime, this.asleepTime, this.wakeTime, this.outTime,
-    this.outerPadding, this.innerPadding, {this.isDark = false, this.activeHandle = _SleepHandle.none}
+    this.outerPadding, this.innerPadding, {this.isDark = false, this.activeHandle = SleepHandle.none}
   );
 
   double getAngle(DateTime dt) {
@@ -1103,7 +1100,7 @@ class SleepEditorPainter extends CustomPainter {
     if (bedSweep <= 0) bedSweep += 2 * pi;
 
     final bedPaint = Paint()
-      ..color = Colors.indigo.withOpacity(0.3)
+      ..color = Colors.indigo.withAlpha(77)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 24
       ..strokeCap = StrokeCap.round;
@@ -1124,7 +1121,7 @@ class SleepEditorPainter extends CustomPainter {
     if (sleepSweep <= 0) sleepSweep += 2 * pi;
 
     final sleepPaint = Paint()
-      ..color = Colors.cyan.withOpacity(0.6)
+      ..color = Colors.cyan.withAlpha(153)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 24
       ..strokeCap = StrokeCap.round;
@@ -1140,7 +1137,7 @@ class SleepEditorPainter extends CustomPainter {
 
     // --- HANDLES / ICONS ---
     // Helper to draw handle with active state
-    void drawHandle(double angle, double r, Color c, IconData icon, _SleepHandle handleType) {
+    void drawHandle(double angle, double r, Color c, IconData icon, SleepHandle handleType) {
       final pos = Offset(center.dx + r * cos(angle), center.dy + r * sin(angle));
       
       final bool isActive = activeHandle == handleType;
@@ -1160,11 +1157,11 @@ class SleepEditorPainter extends CustomPainter {
       canvas.drawCircle(pos, 4, Paint()..color = c);
     }
 
-    drawHandle(bedStartAngle, radius - outerPadding, Colors.indigo, Icons.bed, _SleepHandle.bed);
-    drawHandle(outAngle, radius - outerPadding, Colors.indigo, Icons.directions_walk, _SleepHandle.out);
+    drawHandle(bedStartAngle, radius - outerPadding, Colors.indigo, Icons.bed, SleepHandle.bed);
+    drawHandle(outAngle, radius - outerPadding, Colors.indigo, Icons.directions_walk, SleepHandle.out);
     
-    drawHandle(asleepStartAngle, radius - innerPadding, Colors.cyan, Icons.nights_stay, _SleepHandle.asleep);
-    drawHandle(wakeAngle, radius - innerPadding, Colors.cyan, Icons.wb_sunny, _SleepHandle.wake);
+    drawHandle(asleepStartAngle, radius - innerPadding, Colors.cyan, Icons.nights_stay, SleepHandle.asleep);
+    drawHandle(wakeAngle, radius - innerPadding, Colors.cyan, Icons.wb_sunny, SleepHandle.wake);
   }
   
   @override

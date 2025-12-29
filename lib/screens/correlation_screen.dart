@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../models.dart';
@@ -11,19 +10,19 @@ class CorrelationScreen extends StatefulWidget {
   State<CorrelationScreen> createState() => _CorrelationScreenState();
 }
 
-enum _HabitType { caffeine, alcohol, exercise }
+enum HabitType { caffeine, alcohol, exercise }
 
-class _ScatterPoint {
+class ScatterPoint {
   final double time; // 0-24 hour format (relative to bed time day)
   final double latency; // minutes
-  final _HabitType type;
+  final HabitType type;
   
-  _ScatterPoint(this.time, this.latency, this.type);
+  ScatterPoint(this.time, this.latency, this.type);
 }
 
 class _CorrelationScreenState extends State<CorrelationScreen> {
   final LogService _logService = LogService();
-  List<_ScatterPoint> _points = [];
+  List<ScatterPoint> _points = [];
   bool _isLoading = true;
 
   // Settings
@@ -39,7 +38,7 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
     setState(() => _isLoading = true);
     
     final allLogs = await _logService.getAllLogs();
-    List<_ScatterPoint> points = [];
+    List<ScatterPoint> points = [];
     
     final sortedKeys = allLogs.keys.toList()..sort();
     final cutoff = DateTime.now().subtract(Duration(days: _daysToAnalyze));
@@ -112,7 +111,7 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
       
       DateTime? lastCaffeine = findLatestTime(caffeineTimes);
       if (lastCaffeine != null) {
-        points.add(_ScatterPoint(_timeToDouble(lastCaffeine), latency, _HabitType.caffeine));
+        points.add(ScatterPoint(_timeToDouble(lastCaffeine), latency, HabitType.caffeine));
       }
 
       // 2. Alcohol (Check for 'alcohol' ID and legacy IDs)
@@ -123,14 +122,14 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
 
       DateTime? lastAlcohol = findLatestTime(alcoholTimes);
       if (lastAlcohol != null) {
-        points.add(_ScatterPoint(_timeToDouble(lastAlcohol), latency, _HabitType.alcohol));
+        points.add(ScatterPoint(_timeToDouble(lastAlcohol), latency, HabitType.alcohol));
       }
 
       // 3. Exercise
       List<DateTime> exerciseTimes = combinedExercise.map((e) => e.finishTime).toList();
       DateTime? lastExercise = findLatestTime(exerciseTimes);
       if (lastExercise != null) {
-         points.add(_ScatterPoint(_timeToDouble(lastExercise), latency, _HabitType.exercise));
+         points.add(ScatterPoint(_timeToDouble(lastExercise), latency, HabitType.exercise));
       }
     }
 
@@ -176,9 +175,9 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[50],
+                      color: isDark ? Colors.white.withAlpha(13) : Colors.grey[50],
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.grey.withOpacity(0.2)),
+                      border: Border.all(color: Colors.grey.withAlpha(51)),
                     ),
                     child: _points.isEmpty 
                       ? const Center(child: Text("Not enough habit data logged yet."))
@@ -233,7 +232,7 @@ class _LegendItem extends StatelessWidget {
 }
 
 class ScatterPlotPainter extends CustomPainter {
-  final List<_ScatterPoint> points;
+  final List<ScatterPoint> points;
   final bool isDark;
 
   ScatterPlotPainter(this.points, this.isDark);
@@ -246,7 +245,7 @@ class ScatterPlotPainter extends CustomPainter {
     final graphH = size.height - paddingBottom;
 
     final paintGrid = Paint()
-      ..color = Colors.grey.withOpacity(0.2)
+      ..color = Colors.grey.withAlpha(51)
       ..strokeWidth = 1;
 
     final textPainter = TextPainter(textDirection: ui.TextDirection.ltr);
@@ -305,9 +304,9 @@ class ScatterPlotPainter extends CustomPainter {
       if (x >= paddingLeft && x <= size.width + 10) { 
         Paint targetPaint;
         switch (p.type) {
-          case _HabitType.caffeine: targetPaint = paintCaffeine; break;
-          case _HabitType.alcohol: targetPaint = paintAlcohol; break;
-          case _HabitType.exercise: targetPaint = paintExercise; break;
+          case HabitType.caffeine: targetPaint = paintCaffeine; break;
+          case HabitType.alcohol: targetPaint = paintAlcohol; break;
+          case HabitType.exercise: targetPaint = paintExercise; break;
         }
 
         canvas.drawCircle(Offset(x, y), 5, targetPaint);

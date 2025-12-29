@@ -371,7 +371,7 @@ This export contains your sleep tracking data in a structured folder format.
       final zipFileName = 'sleep_data_export_${DateFormat('yyyy-MM-dd_HH-mm-ss').format(DateTime.now())}.zip';
       final zipFile = File("${directory.path}/$zipFileName");
       await zipFile.writeAsBytes(zipData);
-      print('Zip file created: ${zipFile.path}');
+      // print('Zip file created: ${zipFile.path}');
 
       // Share the zip file
       await SharePlus.instance.share(
@@ -422,20 +422,26 @@ This export contains your sleep tracking data in a structured folder format.
         } else if (headers.contains('Exercise Type')) { // 'Duration Mins' might not be in some exports
           importCount = await _importExerciseLog(rows);}
           else if (headers.contains('iconName') && headers.contains('colorHex')) {
-           String fileName = file.uri.pathSegments.last.toLowerCase();
-           String? categoryType;
+            String fileName = file.uri.pathSegments.last.toLowerCase();
+            String? categoryType;
            
-           if (fileName.contains('day_type')) categoryType = 'day_types';
-           else if (fileName.contains('sleep_location')) categoryType = 'sleep_locations';
-           else if (fileName.contains('medication_type')) categoryType = 'medication_types';
-           else if (fileName.contains('exercise_type')) categoryType = 'exercise_types';
-           else if (fileName.contains('substance_type')) categoryType = 'substance_types';
-           
-           if (categoryType != null) {
-              importCount = await _importUserCategories(rows, categoryType);
-           } else {
-              throw Exception("Could not determine category type from filename '${file.uri.pathSegments.last}'. Please use files like 'day_types.csv'.");
-           }
+            if (fileName.contains('day_type')) {
+              categoryType = 'day_types';
+            } else if (fileName.contains('sleep_location')) {
+              categoryType = 'sleep_locations';
+            } else if (fileName.contains('medication_type')) {
+              categoryType = 'medication_types';
+            } else if (fileName.contains('exercise_type')) {
+              categoryType = 'exercise_types';
+            } else if (fileName.contains('substance_type')) {
+              categoryType = 'substance_types';
+            }
+
+            if (categoryType != null) {
+                importCount = await _importUserCategories(rows, categoryType);
+            } else {
+                throw Exception("Could not determine category type from filename '${file.uri.pathSegments.last}'. Please use files like 'day_types.csv'.");
+            }
         } else {
           throw Exception("Unknown CSV format. Please import sleep_log.csv, medication_log.csv, etc.");
         }
@@ -671,11 +677,6 @@ This export contains your sleep tracking data in a structured folder format.
         DateTime start = DateTime(date.year, date.month, date.day, int.parse(startP[0]), int.parse(startP[1]));
         DateTime end = DateTime(date.year, date.month, date.day, int.parse(endP[0]), int.parse(endP[1]));
         if (end.isBefore(start)) end = end.add(const Duration(days: 1));
-
-        int csvDuration = -1;
-        if (row.length > 4 && row[4] != null) {
-           csvDuration = int.tryParse(row[4].toString().trim()) ?? 0;
-        }
 
         DailyLog log = await getDailyLog(utcDate);
 

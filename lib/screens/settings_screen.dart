@@ -70,7 +70,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     final isDark = mode == ThemeMode.dark;
                     return Chip(
                       label: const Text("Version 2.0"),
-                      backgroundColor: Colors.indigo.withOpacity(0.1),
+                      backgroundColor: Colors.indigo.withAlpha(25),
                       labelStyle: TextStyle(color: (isDark ? Colors.indigo[200] : Colors.indigo[800]), fontWeight: FontWeight.bold),
                     );
                   },
@@ -88,7 +88,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       title: const Text("Dark Mode"),
                       secondary: Icon(isDark ? Icons.dark_mode : Icons.light_mode),
                       value: isDark,
-                      activeColor: Colors.indigoAccent,
+                      activeThumbColor: Colors.indigoAccent,
                       onChanged: (val) {
                         themeNotifier.value = val ? ThemeMode.dark : ThemeMode.light;
                         LogService().setDarkMode(val);
@@ -105,7 +105,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   subtitle: const Text("Show Add Meds/Sleep in notification bar"),
                   secondary: const Icon(Icons.notifications_active_outlined),
                   value: _isNotifEnabled,
-                  activeColor: Colors.indigoAccent,
+                  activeThumbColor: Colors.indigoAccent,
                   onChanged: (val) async {
                     setState(() => _isNotifEnabled = val);
                     await _logService.setNotificationsEnabled(val);

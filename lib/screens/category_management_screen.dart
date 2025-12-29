@@ -102,7 +102,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: selectedIcon, // Changed from initialValue to value to reflect updates
+                initialValue: selectedIcon, // Changed from initialValue to value to reflect updates
                 items: [
                   'work_outline',
                   'self_improvement_outlined',
@@ -135,7 +135,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: selectedColor, // Changed from initialValue to value
+                initialValue: selectedColor, // Changed from initialValue to value
                 items: [
                   '0xFF1565C0', // blue
                   '0xFF2E7D32', // green

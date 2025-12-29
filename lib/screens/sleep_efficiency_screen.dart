@@ -2,7 +2,6 @@ import 'dart:math';
 import 'dart:ui' as ui; // Added to resolve TextDirection
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../models.dart';
 import '../log_service.dart';
 
 class SleepEfficiencyScreen extends StatefulWidget {
@@ -117,9 +116,9 @@ class _SleepEfficiencyScreenState extends State<SleepEfficiencyScreen> {
                   Expanded(
                     child: Container(
                       decoration: BoxDecoration(
-                        color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[50],
+                        color: isDark ? Colors.white.withAlpha(13) : Colors.grey[50],
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.grey.withOpacity(0.2)),
+                        border: Border.all(color: Colors.grey.withAlpha(51)),
                       ),
                       padding: const EdgeInsets.all(16),
                       child: LayoutBuilder(
