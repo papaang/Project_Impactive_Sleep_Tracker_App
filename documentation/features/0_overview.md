@@ -18,6 +18,13 @@ This app is particularly beneficial for individuals with circadian rhythm disord
 
 Built with Flutter for potential cross-platform compatibility, but primarily tested on Android devices. The app supports data persistence and provides export functionality for external analysis.
 
+## How it could be improved
+- Proper handling of time zone changes.
+- Implement automatic backups of app data with Google Drive, OneDrive, etc. accounts.
+- Ability to edit sleep entries and drag-and-drop events from the classic sleep diary visualisation.
+- Ability to export the generated sleep diary as a multi-page PDF.
+- More appearance settings – ability to customise font style, font size, and more color themes.
+
 ## Documentation Contents
 
 1. **[User Interface](1_user_interface.md)**
