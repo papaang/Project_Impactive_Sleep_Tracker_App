@@ -18,6 +18,9 @@ Users can export their sleep data as a ZIP file containing multiple CSV files an
 
 The export includes a timestamped ZIP file that can be shared directly from the app.
 
+> [!NOTE]
+> A copy of your ZIP data export can also be found in Internal Storage.
+
 ## Data Import
 
 The app supports importing individual CSV log files and user categories, enabling:
