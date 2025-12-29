@@ -420,7 +420,22 @@ This export contains your sleep tracking data in a structured folder format.
         } else if (headers.contains('Substance Type') && headers.contains('Amount')) {
           importCount = await _importSubstanceLog(rows);
         } else if (headers.contains('Exercise Type')) { // 'Duration Mins' might not be in some exports
-          importCount = await _importExerciseLog(rows);
+          importCount = await _importExerciseLog(rows);}
+          else if (headers.contains('iconName') && headers.contains('colorHex')) {
+           String fileName = file.uri.pathSegments.last.toLowerCase();
+           String? categoryType;
+           
+           if (fileName.contains('day_type')) categoryType = 'day_types';
+           else if (fileName.contains('sleep_location')) categoryType = 'sleep_locations';
+           else if (fileName.contains('medication_type')) categoryType = 'medication_types';
+           else if (fileName.contains('exercise_type')) categoryType = 'exercise_types';
+           else if (fileName.contains('substance_type')) categoryType = 'substance_types';
+           
+           if (categoryType != null) {
+              importCount = await _importUserCategories(rows, categoryType);
+           } else {
+              throw Exception("Could not determine category type from filename '${file.uri.pathSegments.last}'. Please use files like 'day_types.csv'.");
+           }
         } else {
           throw Exception("Unknown CSV format. Please import sleep_log.csv, medication_log.csv, etc.");
         }
@@ -452,6 +467,46 @@ This export contains your sleep tracking data in a structured folder format.
     if (val is int) return val;
     if (val is double) return val.toInt();
     return int.tryParse(val.toString().trim()) ?? 0;
+  }
+   Future<int> _importUserCategories(List<List<dynamic>> rows, String categoryType) async {
+    int count = 0;
+    List<Category> existing = await CategoryManager().getCategories(categoryType);
+    
+    // Skip header (i=1)
+    for (int i = 1; i < rows.length; i++) {
+      var row = rows[i];
+      if (row.length < 4) continue; // id, name, icon, color required
+      
+      try {
+        String id = row[0].toString().trim();
+        String name = row[1].toString().trim();
+        String iconName = row[2].toString().trim();
+        String colorHex = row[3].toString().trim();
+        int? defaultDosage;
+        if (row.length > 4 && row[4].toString().trim().isNotEmpty) {
+           defaultDosage = int.tryParse(row[4].toString().trim());
+        }
+
+        // Deduplicate by ID
+        if (!existing.any((c) => c.id == id)) {
+           existing.add(Category(
+             id: id,
+             name: name,
+             iconName: iconName,
+             colorHex: colorHex,
+             defaultDosage: defaultDosage
+           ));
+           count++;
+        }
+      } catch (e) {
+        debugPrint("Error importing category row $i: $e");
+      }
+    }
+    
+    if (count > 0) {
+      await CategoryManager().saveCategories(categoryType, existing);
+    }
+    return count;
   }
 
   Future<int> _importSleepLog(List<List<dynamic>> rows) async {
@@ -604,6 +659,7 @@ This export contains your sleep tracking data in a structured folder format.
     int count = 0;
     for (int i = 1; i < rows.length; i++) {
       var row = rows[i];
+      if (row.length < 4) continue;
       try {
         DateTime date = DateTime.parse(row[0].toString().trim());
         DateTime utcDate = DateTime.utc(date.year, date.month, date.day);
@@ -616,14 +672,19 @@ This export contains your sleep tracking data in a structured folder format.
         DateTime end = DateTime(date.year, date.month, date.day, int.parse(endP[0]), int.parse(endP[1]));
         if (end.isBefore(start)) end = end.add(const Duration(days: 1));
 
+        int csvDuration = -1;
+        if (row.length > 4 && row[4] != null) {
+           csvDuration = int.tryParse(row[4].toString().trim()) ?? 0;
+        }
+
         DailyLog log = await getDailyLog(utcDate);
 
         bool exists = log.exerciseLog.any((e) => 
-           e.exerciseTypeId == exType && 
+           e.exerciseTypeId.toLowerCase() == exType.toLowerCase() && 
            _isSameMinute(e.startTime, start) &&
-           _isSameMinute(e.finishTime, end)
+           _isSameMinute(e.finishTime, end) &&
+           e.finishTime.difference(e.startTime).inMinutes == end.difference(start).inMinutes
         );
-
         if (!exists) {
           log.exerciseLog.add(ExerciseEntry(
             exerciseTypeId: exType, 

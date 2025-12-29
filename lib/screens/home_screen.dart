@@ -75,8 +75,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  void _updateNotification() {
-    _notificationService.showPersistentControls(isSleeping: _todayLog.isSleeping);
+ void _updateNotification() {
+    if (_logService.areNotificationsEnabled) {
+      _notificationService.showPersistentControls(isSleeping: _todayLog.isSleeping);
+    } else {
+      _notificationService.cancelAll();
+    }
   }
 
   @override
