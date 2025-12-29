@@ -20,16 +20,13 @@ The export includes a timestamped ZIP file that can be shared directly from the 
 
 ## Data Import
 
-The app supports importing individual CSV files (e.g., sleep_log.csv, substance_log.csv, medication_log.csv, exercise_log.csv), enabling:
+The app supports importing individual CSV log files and user categories, enabling:
 
 - Restoring from backups
 - Migrating data between devices
 - Combining data from multiple sources
 
-<!-- Import automatically deduplicates entries to avoid duplicates. -->
-
-> [!NOTE]
-> Importing user categories from CSV is not currently implemented, but these can be edited from the [category management screen](/documentation/features/3_events.md#categories)
+The import function automatically deduplicates entries.
 
 ## Privacy and Security
 
