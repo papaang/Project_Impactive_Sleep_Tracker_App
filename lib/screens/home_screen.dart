@@ -93,7 +93,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _checkDayChange();
-      _loadTodayLog(); 
     }
   }
 
@@ -122,14 +121,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       setState(() => _isLoading = true);
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
-      
-      final log = await _logService.getDailyLog(today);
+      final yesterday = today.subtract(const Duration(days: 1));
+
+      // Check if there's an ongoing session from yesterday
+      final yesterdayLog = await _logService.getDailyLog(yesterday);
+      final hasOngoingSession = yesterdayLog.isSleeping || yesterdayLog.isAwakeInBed;
+
+      final DateTime loadDate = hasOngoingSession ? yesterday : today;
+      final log = hasOngoingSession ? yesterdayLog : await _logService.getDailyLog(today);
       final dayTypes = await CategoryManager().getCategories('day_types');
 
       setState(() {
         _todayLog = log;
         _dayTypes = dayTypes;
-        _loadedDate = today; 
+        _loadedDate = loadDate;
 
         if (log.isSleeping) {
           final start = log.currentBedTime ?? DateTime.now();
@@ -280,7 +285,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _handleOutOfBed() async {
     final DateTime outTime = DateTime.now();
-    
+
     final DateTime bedTime = _todayLog.currentBedTime ?? outTime;
     final DateTime wakeTime = _todayLog.currentWakeTime ?? outTime;
     final DateTime fellAsleepTime = _todayLog.currentFellAsleepTime ?? bedTime;
@@ -292,31 +297,37 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       outOfBedTime: outTime,
     );
 
-    _todayLog.sleepLog.add(newSleep);
+    // Determine save date based on wakeTime (day of waking up)
+    final DateTime saveDate = DateTime(wakeTime.year, wakeTime.month, wakeTime.day);
 
+    // Get the log for the save date
+    DailyLog saveLog = await _logService.getDailyLog(saveDate);
+
+    // Add the sleep entry to the save log
+    saveLog.sleepLog.add(newSleep);
+
+    // Save the log to the save date
+    await _logService.saveDailyLog(saveDate, saveLog);
+
+    // Reset the ongoing session in the current log
     _todayLog.isSleeping = false;
     _todayLog.isAwakeInBed = false;
     _todayLog.currentBedTime = null;
     _todayLog.currentWakeTime = null;
     _todayLog.currentFellAsleepTime = null;
 
-    setState(() {
-       int sessions = _todayLog.sleepLog.length;
-       double totalHours = _todayLog.totalSleepHours;
-       _sleepMessage = "Logged $sessions sleep session(s).\nTotal: ${_formatHoursToHHhMMm(totalHours)}";
-    });
-
+    // Save the current log (reset state)
     await _logService.saveDailyLog(_loadedDate, _todayLog);
     _updateNotification();
-    
+
+    // Reload today's log to reflect changes
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    
+
     if (!isSameDay(_loadedDate, today)) {
-      // print("Sleep cycle finished for yesterday. Switching to today.");
-      await Future.delayed(Duration(milliseconds: 500));
-      _loadTodayLog(); 
+      await Future.delayed(const Duration(milliseconds: 500));
     }
+    _loadTodayLog();
   }
 
   Future<void> _showDayTypeDialog() async {
