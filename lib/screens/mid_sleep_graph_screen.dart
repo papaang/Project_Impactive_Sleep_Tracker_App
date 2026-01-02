@@ -75,12 +75,13 @@ class _MidSleepGraphScreenState extends State<MidSleepGraphScreen> {
         title: const Text('Circadian Drift'),
         centerTitle: true,
       ),
-      body: _isLoading 
+      body: SafeArea( 
+        child: _isLoading 
         ? const Center(child: CircularProgressIndicator())
         : _dataPoints.isEmpty 
           ? const Center(child: Text("Not enough sleep data yet."))
           : Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 48.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -137,6 +138,7 @@ class _MidSleepGraphScreenState extends State<MidSleepGraphScreen> {
                 ],
               ),
             ),
+      ),
     );
   }
 
@@ -170,8 +172,8 @@ class _MidSleepGraphScreenState extends State<MidSleepGraphScreen> {
           Column(
             children: [
               const Text("Average Mid-Sleep", style: TextStyle(fontSize: 12, color: Colors.grey)),
-              const SizedBox(height: 4),
-              Text(timeStr, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.indigoAccent)),
+              const SizedBox(height: 15),
+              Text(timeStr, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.indigoAccent), ),
             ],
           ),
         ],

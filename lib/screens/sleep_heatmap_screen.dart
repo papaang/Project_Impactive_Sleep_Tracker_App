@@ -218,7 +218,7 @@ class _SleepHeatmapScreenState extends State<SleepHeatmapScreen> {
                         const Text("More", style: TextStyle(fontSize: 12, color: Colors.grey)),
                       ],
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 280),
                   ],
                 ),
               );
