@@ -316,8 +316,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _todayLog.currentWakeTime = null;
     _todayLog.currentFellAsleepTime = null;
 
-    // Save the current log (reset state)
-    await _logService.saveDailyLog(_loadedDate, _todayLog);
+    // Save the current log (reset state) only if it's a different date than where we saved the entry
+    if (!isSameDay(saveDate, _loadedDate)) {
+      await _logService.saveDailyLog(_loadedDate, _todayLog);
+    }
     _updateNotification();
 
     // Reload today's log to reflect changes
