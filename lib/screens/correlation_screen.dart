@@ -151,7 +151,8 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text("Habits vs. Sleep Latency")),
-      body: _isLoading 
+      body: SafeArea( // Wrapped in SafeArea
+        child: _isLoading 
         ? const Center(child: CircularProgressIndicator())
         : Padding(
             padding: const EdgeInsets.all(16.0),
@@ -206,9 +207,11 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
                      style: TextStyle(fontSize: 10, color: Colors.grey),
                    )
                 ),
+                const SizedBox(height: 50),
               ],
             ),
           )
+      ),
     );
   }
 }

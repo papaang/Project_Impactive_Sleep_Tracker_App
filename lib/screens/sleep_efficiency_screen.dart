@@ -148,7 +148,7 @@ class _SleepEfficiencyScreenState extends State<SleepEfficiencyScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 0),
                   
                   // Legend / Key
                   Row(
@@ -169,7 +169,7 @@ class _SleepEfficiencyScreenState extends State<SleepEfficiencyScreen> {
     return Row(
       children: [
         Container(
-          width: 12, height: 12,
+          width: 12, height: 100,
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 6),

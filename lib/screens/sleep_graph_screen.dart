@@ -25,11 +25,39 @@ class _SleepGraphScreenState extends State<SleepGraphScreen> {
   final double _hourWidth = 60.0; // Increased width for better spacing
   late final double _graphWidth; 
 
-  @override
+
+  final ScrollController _dateController = ScrollController();
+  final ScrollController _graphController = ScrollController();
+
+ @override
   void initState() {
     super.initState();
     _graphWidth = _hourWidth * 25; // 24 hours + 1 buffer
     _loadData();
+
+
+    _dateController.addListener(() {
+      if (_dateController.hasClients && _graphController.hasClients) {
+        if (_dateController.offset != _graphController.offset) {
+          _graphController.jumpTo(_dateController.offset);
+        }
+      }
+    });
+
+    _graphController.addListener(() {
+      if (_dateController.hasClients && _graphController.hasClients) {
+        if (_graphController.offset != _dateController.offset) {
+          _dateController.jumpTo(_graphController.offset);
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _dateController.dispose();
+    _graphController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -65,8 +93,6 @@ class _SleepGraphScreenState extends State<SleepGraphScreen> {
     final sortedKeys = _logs.keys.toList()..sort((a, b) => b.compareTo(a)); 
     
     // We want to show _daysToLoad starting from today (or latest available)
-    // Filter to exclude future dates beyond "today" if desired, or just take the top N.
-    // For safety, let's just use the loaded keys that are <= today.
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     
@@ -103,7 +129,8 @@ class _SleepGraphScreenState extends State<SleepGraphScreen> {
                     // Rows
                     Expanded(
                       child: ListView.builder(
-                        physics: const ClampingScrollPhysics(), // Sync scroll manually if needed
+                        controller: _dateController, // Attached Controller
+                        physics: const ClampingScrollPhysics(), 
                         itemCount: displayDates.length,
                         itemBuilder: (context, index) {
                           final date = displayDates[index];
@@ -170,16 +197,16 @@ class _SleepGraphScreenState extends State<SleepGraphScreen> {
                         // Rows
                         Expanded(
                           child: ListView.builder(
+                            controller: _graphController, 
                             physics: const ClampingScrollPhysics(),
                             itemCount: displayDates.length,
                             itemBuilder: (context, index) {
                               final date = displayDates[index];
                               
                               // FETCH PREVIOUS, CURRENT AND NEXT DAY LOGS
-                              // This ensures we catch sleep sessions that span across midnight 
-                              // regardless of whether they are logged in the start-date or end-date file.
                               List<DailyLog> rowLogs = [];
                               
+
                               final prevDate = date.subtract(const Duration(days: 1));
                               if (_logs[prevDate] != null) rowLogs.add(_logs[prevDate]!);
                               
@@ -220,7 +247,6 @@ class _SleepGraphScreenState extends State<SleepGraphScreen> {
 // ---------------------------------------------------------------------------
 // --- PAINTERS ---
 // ---------------------------------------------------------------------------
-
 class GraphHeaderPainter extends CustomPainter {
   final double hourWidth;
   final bool isDark;
@@ -237,9 +263,7 @@ class GraphHeaderPainter extends CustomPainter {
       double x = i * hourWidth;
       
       // Draw Hour Label every 3 hours for clarity, or every hour if space permits
-      // Let's do every 3 hours: 00, 03, ... 21, 24
       if (i % 3 == 0) {
-        // Special case for last label 24 -> 24 is clear for end of day.
         String label = i.toString().padLeft(2, '0');
         if (i == 24) label = "24"; 
         
@@ -330,7 +354,6 @@ class GraphRowPainter extends CustomPainter {
       // Caffeine (C/A) - UPDATED LOGIC HERE
       for (var s in log.substanceLog) {
         String code = "C"; 
-        
         // Check for 'alcohol' ID or legacy names
         if (s.substanceTypeId == 'alcohol' || 
             s.substanceTypeId.toLowerCase().contains('wine') || 
@@ -362,7 +385,6 @@ class GraphRowPainter extends CustomPainter {
 
     for (var sym in symbols) {
       double x = getX(sym.time);
-      // Only check bounds for X (0-24h)
       if (x < 0 || x > 24 * hourWidth) continue;
 
       textPainter.text = TextSpan(
@@ -377,7 +399,6 @@ class GraphRowPainter extends CustomPainter {
       bool placed = false;
       
       // Try vertical positions first (Center, Up, Down, Far Up, Far Down)
-      // Expanded offsets due to increased row height (80.0)
       List<double> yOffsets = [0, -18, 18, -36, 36]; 
       // Try horizontal shift as fallback (Center, Right, Left)
       List<double> xOffsets = [0, 12, -12];
@@ -387,7 +408,6 @@ class GraphRowPainter extends CustomPainter {
           double y = size.height / 2 - h / 2 + dy;
           Rect candidate = Rect.fromLTWH(x - w / 2 + dx, y, w, h); 
 
-          // Simple overlap check with padding
           bool overlaps = false;
           for (var r in drawnRects) {
             if (candidate.inflate(2).overlaps(r)) {
@@ -406,7 +426,6 @@ class GraphRowPainter extends CustomPainter {
         if (placed) break;
       }
       
-      // If we couldn't place it, draw it anyway at bottom slot
       if (!placed) {
          double y = size.height / 2 - h / 2 + 36; 
          canvas.drawText(textPainter, Offset(x - w / 2, y));
