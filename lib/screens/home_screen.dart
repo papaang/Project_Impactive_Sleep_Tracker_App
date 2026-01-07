@@ -306,15 +306,35 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // Add the sleep entry to the save log
     saveLog.sleepLog.add(newSleep);
 
-    // Save the log to the save date
-    await _logService.saveDailyLog(saveDate, saveLog);
+    // Reset the ongoing session flags in the save log
+    saveLog.isSleeping = false;
+    saveLog.isAwakeInBed = false;
+    saveLog.currentBedTime = null;
+    saveLog.currentWakeTime = null;
+    saveLog.currentFellAsleepTime = null;
 
-    // Reset the ongoing session in the current log
+    // Update the in-memory log if saving to the loaded date
+    if (isSameDay(saveDate, _loadedDate)) {
+      _todayLog = saveLog;
+    }
+
+    // Update the sleep message immediately
+    int sessions = saveLog.sleepLog.length;
+    double totalHours = saveLog.totalSleepHours;
+    _sleepMessage = "Logged $sessions sleep session(s).\nTotal: ${_formatHoursToHHhMMm(totalHours)}";
+
+    // Reset the ongoing session flags in the current log (in memory)
     _todayLog.isSleeping = false;
     _todayLog.isAwakeInBed = false;
     _todayLog.currentBedTime = null;
     _todayLog.currentWakeTime = null;
     _todayLog.currentFellAsleepTime = null;
+
+    // Update the UI immediately
+    setState(() {});
+
+    // Save the log to the save date
+    await _logService.saveDailyLog(saveDate, saveLog);
 
     // Save the current log (reset state) only if it's a different date than where we saved the entry
     if (!isSameDay(saveDate, _loadedDate)) {
@@ -323,12 +343,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _updateNotification();
 
     // Reload today's log to reflect changes
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-
-    if (!isSameDay(_loadedDate, today)) {
-      await Future.delayed(const Duration(milliseconds: 500));
-    }
     _loadTodayLog();
   }
 
