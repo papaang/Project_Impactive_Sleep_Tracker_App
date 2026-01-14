@@ -182,7 +182,7 @@ class LogService {
           int totalMinutes = (entry.durationHours * 60).round();
           int hrs = totalMinutes ~/ 60;
           int mins = totalMinutes % 60;
-          String sleepDuration = "${hrs}hrs ${mins}min";
+          String sleepDuration = "${hrs.toString().padLeft(2, '0')}:${mins.toString().padLeft(2, '0')}";
 
           sleepRows.add([
             DateFormat('yyyy-MM-dd').format(date),
