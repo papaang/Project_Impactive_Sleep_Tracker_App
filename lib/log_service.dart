@@ -109,7 +109,7 @@ class LogService {
 
       final sortedKeys = allLogs.keys.toList()..sort();
       final dayTypes = await CategoryManager().getCategories('day_types');
-
+      final medicationTypes = await CategoryManager().getCategories('medication_types');
       // 1. Main Daily Log
       List<List<dynamic>> mainRows = [];
       mainRows.add([
@@ -224,12 +224,15 @@ class LogService {
 
       // 4. Medication Log
      List<List<dynamic>> medicationRows = [];
-      medicationRows.add(["Date", "Medication Type", "Dosage", "Time"]);
+      medicationRows.add(["Date", "Medication Name", "Medication ID", "Dosage", "Time"]);
       for (var date in sortedKeys) {
         final log = allLogs[date]!;
         for (var entry in log.medicationLog) {
+          final cat = medicationTypes.where((c) => c.id == entry.medicationTypeId).firstOrNull;
+          final displayName = cat?.name ?? entry.medicationTypeId;
           medicationRows.add([
             DateFormat('yyyy-MM-dd').format(date),
+            displayName,
             entry.medicationTypeId,
             entry.dosage,
             DateFormat('HH:mm').format(entry.time)
@@ -599,15 +602,22 @@ This export contains your sleep tracking data in a structured folder format.
       try {
         DateTime date = DateTime.parse(row[0].toString().trim());
         DateTime utcDate = DateTime.utc(date.year, date.month, date.day);
-        
+        String medType;
+        String dosage;
+        DateTime time;
+        if (row.length == 5) {
         // Parse time column (Index 3)
-        final timeStr = row[3].toString().trim();
-        final parts = timeStr.split(':');
-        DateTime time = DateTime(date.year, date.month, date.day, int.parse(parts[0]), int.parse(parts[1]));
-        
-        String medType = row[1].toString().trim();
-        String dosage = row[2].toString().trim();
-
+        medType = row[2].toString().trim(); // ID is at index 2
+           dosage = row[3].toString().trim();
+           final parts = row[4].toString().trim().split(':');
+           time = DateTime(date.year, date.month, date.day, int.parse(parts[0]), int.parse(parts[1]));
+        } else {
+           // Old Format
+           medType = row[1].toString().trim(); // ID was at index 1
+           dosage = row[2].toString().trim();
+           final parts = row[3].toString().trim().split(':');
+           time = DateTime(date.year, date.month, date.day, int.parse(parts[0]), int.parse(parts[1]));
+        }
         DailyLog log = await getDailyLog(utcDate);
         
         bool exists = log.medicationLog.any((e) => 
