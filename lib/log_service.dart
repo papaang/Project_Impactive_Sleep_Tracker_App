@@ -174,17 +174,22 @@ class LogService {
 
       // 2. Sleep Log
       List<List<dynamic>> sleepRows = [];
-      sleepRows.add(["Date", "Bed Time", "Fell Asleep Time", "Wake Time", "Out Of Bed Time", "Sleep Location", "Sleep Latency Mins", "Awakenings Count", "Awake Duration Mins", "Sleep Location"]);
+      sleepRows.add(["Date", "Bed Time", "Fell Asleep Time", "Wake Time", "Out Of Bed Time", "Sleep Duration (Hrs)", "Sleep Latency Mins", "Awakenings Count", "Awake Duration Mins", "Sleep Location"]);
       for (var date in sortedKeys) {
         final log = allLogs[date]!;
         for (var entry in log.sleepLog) {
+          int totalMinutes = (entry.durationHours * 60).round();
+          int hrs = totalMinutes ~/ 60;
+          int mins = totalMinutes % 60;
+          String sleepDuration = "${hrs}hrs ${mins}min";
+
           sleepRows.add([
             DateFormat('yyyy-MM-dd').format(date),
             DateFormat('HH:mm').format(entry.bedTime),
             DateFormat('HH:mm').format(entry.fellAsleepTime),
             DateFormat('HH:mm').format(entry.wakeTime),
             entry.outOfBedTime != null ? DateFormat('HH:mm').format(entry.outOfBedTime!) : "",
-            entry.durationHours.toStringAsFixed(2),
+            sleepDuration,
             entry.sleepLatencyMinutes,
             entry.awakeningsCount,
             entry.awakeDurationMinutes,
