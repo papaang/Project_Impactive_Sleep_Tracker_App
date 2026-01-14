@@ -169,7 +169,8 @@ class LogService {
 
       String mainCsvData = const ListToCsvConverter().convert(mainRows);
        final mainFile = File("${exportDir.path}/main_daily_log.csv");
-      await mainFile.writeAsString(mainCsvData);
+      await mainFile.writeAsString('\uFEFF$mainCsvData'); //this is for reading emojis. restore old version (next line) if issues
+      //await mainFile.writeAsString(mainCsvData);
       
 
       // 2. Sleep Log
