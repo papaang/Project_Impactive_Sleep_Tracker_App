@@ -1,3 +1,25 @@
+//Correlation Graph - How it works:
+//This graph  is designed to help you visualize how the timing of your daily activities (Caffeine, Alcohol, and Exercise) impacts your ability to fall asleep.
+// It analyzes the user's logged habits (caffeine, alcohol, exercise) over the past N days
+// and correlates them with sleep latency (time taken to fall asleep).
+// It fetches habit events from both the current day and the previous day relative to each sleep
+// session to capture late-night habits.
+// X-Axis (Horizontal): Represents the Time of Day the habit occurred.
+// Y-Axis (Vertical): Represents the Sleep Latency (how many minutes it took to fall asleep) for the sleep session 
+// immediately following those habits.
+//
+//The 16-Hour Rule: the app only plots habits that occurred within 16 hours of your bedtime.
+//The "Latest Event" Logic: For each sleep session, it identifies the most recent occurrence of each habit type before bedtime.
+
+//How to Read the Graph:
+//High Dots: Indicate nights where you struggled to fall asleep (High Latency).
+//Low Dots: Indicate nights where you fell asleep quickly (Low Latency).
+//Clusters: If you see a cluster of Brown dots (Caffeine) high up on the right side of the graph, it suggests that consuming 
+// caffeine late in the evening is strongly correlated with taking longer to fall asleep.
+//Vertical Alignment: If dots of a certain color are consistently higher than others, that specific habit might be your primary sleep disruptor.
+
+
+
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../models.dart';
@@ -10,7 +32,7 @@ class CorrelationScreen extends StatefulWidget {
   State<CorrelationScreen> createState() => _CorrelationScreenState();
 }
 
-enum HabitType { caffeine, alcohol, exercise }
+enum HabitType { caffeine, alcohol, exercise, medication }
 
 class ScatterPoint {
   final double time; // 0-24 hour format (relative to bed time day)
@@ -60,10 +82,12 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
       // --- FETCH HABITS FROM CURRENT AND PREVIOUS DAY ---
       List<SubstanceEntry> combinedSubstances = [];
       List<ExerciseEntry> combinedExercise = [];
+      List<MedicationEntry> combinedMedications = [];
 
       // 1. Current Day
       combinedSubstances.addAll(log.substanceLog);
       combinedExercise.addAll(log.exerciseLog);
+      combinedMedications.addAll(log.medicationLog);
 
       // 2. Previous Day
       final prevDate = date.subtract(const Duration(days: 1));
@@ -74,12 +98,14 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
         final prevLog = allLogs[prevDateNormalized]!;
         combinedSubstances.addAll(prevLog.substanceLog);
         combinedExercise.addAll(prevLog.exerciseLog);
+        combinedMedications.addAll(prevLog.medicationLog);
       } else {
          // Fallback loop if keys aren't strictly UTC normalized in map
          for(var k in allLogs.keys) {
             if(k.year == prevDate.year && k.month == prevDate.month && k.day == prevDate.day) {
                combinedSubstances.addAll(allLogs[k]!.substanceLog);
                combinedExercise.addAll(allLogs[k]!.exerciseLog);
+                combinedMedications.addAll(allLogs[k]!.medicationLog);
                break;
             }
          }
@@ -131,6 +157,14 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
       if (lastExercise != null) {
          points.add(ScatterPoint(_timeToDouble(lastExercise), latency, HabitType.exercise));
       }
+    
+
+      //4. Medication
+      List<DateTime> medicationTimes = combinedMedications.map((m) => m.time).toList();
+      DateTime? lastMedication = findLatestTime(medicationTimes);
+      if (lastMedication != null) {
+         points.add(ScatterPoint(_timeToDouble(lastMedication), latency, HabitType.medication));
+      } 
     }
 
     if (mounted) {
@@ -198,6 +232,8 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
                     _LegendItem(color: Colors.purple, label: "Alcohol", icon: Icons.local_bar),
                     const SizedBox(width: 12),
                     _LegendItem(color: Colors.orange, label: "Exercise", icon: Icons.fitness_center),
+                    const SizedBox(width: 12),
+                    _LegendItem(color: Colors.blue, label: "Medication", icon: Icons.medication),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -290,6 +326,7 @@ class ScatterPlotPainter extends CustomPainter {
     final paintCaffeine = Paint()..color = Colors.brown..style = PaintingStyle.fill;
     final paintAlcohol = Paint()..color = Colors.purple..style = PaintingStyle.fill;
     final paintExercise = Paint()..color = Colors.orange..style = PaintingStyle.fill;
+    final paintMedication = Paint()..color = Colors.blue..style = PaintingStyle.fill;
 
     for (var p in points) {
       // Scale X (Time)
@@ -310,6 +347,7 @@ class ScatterPlotPainter extends CustomPainter {
           case HabitType.caffeine: targetPaint = paintCaffeine; break;
           case HabitType.alcohol: targetPaint = paintAlcohol; break;
           case HabitType.exercise: targetPaint = paintExercise; break;
+          case HabitType.medication: targetPaint = paintMedication; break;
         }
 
         canvas.drawCircle(Offset(x, y), 5, targetPaint);
