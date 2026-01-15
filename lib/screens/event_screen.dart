@@ -858,7 +858,7 @@ class _SleepSessionEditorState extends State<SleepSessionEditor> {
           ],
         ),
 
-        const SizedBox(height: 24),
+        const SizedBox(height: 32),
         
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -866,20 +866,25 @@ class _SleepSessionEditorState extends State<SleepSessionEditor> {
             TextButton.icon(
               icon: Icon(Icons.close, size: 18),
               onPressed: () => Navigator.pop(context), 
-              label: Text("Cancel", style: TextStyle(color: Colors.grey))
+              label: Text("Cancel", style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold,color: Colors.grey,),)
             ),
-            ElevatedButton.icon(
+             TextButton.icon(
               icon: Icon(Icons.arrow_forward),
-              onPressed: () {
+             onPressed: () {
                 // Basic validation
                 if (_asleepTime.isBefore(_bedTime)) {
                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Asleep time cannot be before Bed time")));
                    return;
                 }
+                if (_wakeTime.isAfter(_outTime)) {
+                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Wake up time cannot be after Out of Bed time")));
+                   return;
+                }
                 setState(() => _currentStep = 2);
-              }, 
-              label: Text("Next")
+              },  
+              label: Text("Next", style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.grey))
             ),
+            
           ],
         )
       ],
@@ -1082,11 +1087,11 @@ class SleepEditorPainter extends CustomPainter {
 
       // Number
       if (i % 6 == 0) {
-        textPainter.text = TextSpan(text: i.toString(), style: TextStyle(fontSize: 10, color: isDark ? Colors.grey[500] : Colors.grey[600]));
+        textPainter.text = TextSpan(text: i.toString(), style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: isDark ? Colors.grey[500] : Colors.grey[600]));
         textPainter.layout();
         canvas.drawText(
           textPainter, 
-          Offset(center.dx + (radius - 20) * cos(angle) - textPainter.width/2, center.dy + (radius - 20) * sin(angle) - textPainter.height/2)
+          Offset(center.dx + (radius - 15) * cos(angle) - textPainter.width/2, center.dy + (radius - 15) * sin(angle) - textPainter.height/2)
         );
       }
     }
