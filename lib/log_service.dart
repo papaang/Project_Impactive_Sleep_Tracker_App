@@ -26,6 +26,12 @@ class LogService {
   Future<void> setDarkMode(bool value) async {
     await _prefs.setBool('is_dark_mode', value);
   }
+// --- USER NAME-----
+  String get userName => _prefs.getString('user_name') ?? 'Patient';
+
+  Future<void> setUserName(String name) async {
+    await _prefs.setString('user_name', name);
+  }
 
   // --- NOTIFICATION PERSISTENCE ---
   bool get areNotificationsEnabled => _prefs.getBool('notifications_enabled') ?? true;
@@ -377,7 +383,10 @@ This export contains your sleep tracking data in a structured folder format.
       final zipData = zipEncoder.encode(archive);
 
       // Save the zip file
-      final zipFileName = 'sleep_data_export_${DateFormat('yyyy-MM-dd_HH-mm-ss').format(DateTime.now())}.zip';
+      final name = userName.trim();
+      final finname = name.isNotEmpty ? name.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_') : 'Patient';
+
+      final zipFileName = 'sleep_data_${finname}_${DateFormat('yyyy-MM-dd_HH-mm-ss').format(DateTime.now())}.zip';
       final zipFile = File("${directory.path}/$zipFileName");
       await zipFile.writeAsBytes(zipData);
       // print('Zip file created: ${zipFile.path}');

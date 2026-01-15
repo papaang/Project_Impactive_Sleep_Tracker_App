@@ -15,11 +15,13 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final LogService _logService = LogService();
   bool _isNotifEnabled = true;
+  String _userName = '';
 
   @override
   void initState() {
     super.initState();
     _isNotifEnabled = _logService.areNotificationsEnabled;
+    _userName = _logService.userName;
   }
 
   Future<void> _launchGitHub() async {
@@ -33,6 +35,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (e) {
       // In case package is missing or platform error
       // debugPrint('Could not launch URL: $e');
+    }
+  }
+
+   Future<void> _updateUserName() async {
+    final TextEditingController controller = TextEditingController(text: _userName);
+    final String? newName = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Enter Your Alias"),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(hintText: "e.g. SleepyHead"),
+          textCapitalization: TextCapitalization.words,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, controller.text), 
+            child: const Text("Save")
+          ),
+        ],
+      )
+    );
+
+    if (newName != null) {
+      await _logService.setUserName(newName);
+      setState(() => _userName = newName);
     }
   }
 
@@ -69,7 +98,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   builder: (context, mode, child) {
                     final isDark = mode == ThemeMode.dark;
                     return Chip(
-                      label: const Text("Version 2.0.2"), //change that when updating
+                      label: const Text("Version 2.0.3"), //change that when updating
                       backgroundColor: Colors.indigo.withAlpha(25),
                       labelStyle: TextStyle(color: (isDark ? Colors.indigo[200] : Colors.indigo[800]), fontWeight: FontWeight.bold),
                     );
@@ -77,6 +106,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               const SizedBox(height: 20),
+
+               // --- USER ALIAS ---
+              Card(
+                child: ListTile(
+                  title: const Text("User Alias"),
+                  subtitle: Text(_userName.isEmpty ? "Tap to set name" : _userName),
+                  leading: const Icon(Icons.person),
+                  trailing: const Icon(Icons.edit, size: 18),
+                  onTap: _updateUserName,
+                ),
+              ),
 
               // --- DARK MODE TOGGLE ---
               ValueListenableBuilder<ThemeMode>(
