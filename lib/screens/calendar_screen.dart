@@ -165,33 +165,93 @@ class _CalendarScreenState extends State<CalendarScreen> {
         margin: const EdgeInsets.all(12.0),
         child: Padding(
           padding: const EdgeInsets.all(8.0),
-          child: TableCalendar(
-            firstDay: DateTime.utc(2020, 1, 1),
-            lastDay: DateTime.utc(
-                DateTime.now().year + 5, 12, 31),
-            focusedDay: _focusedDay,
-            calendarFormat: CalendarFormat.month,
-            selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-            onDaySelected: _onDaySelected,
-            eventLoader: _getEventsForDay,
-            
-            // Increased row height for larger touch targets (default is ~52)
-            rowHeight: 65.0, 
+          child: Column(
+            children: [
+              // Custom Header for clearer interaction
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left),
+                      onPressed: () {
+                        setState(() {
+                          _focusedDay = DateTime(_focusedDay.year, _focusedDay.month - 1);
+                        });
+                      },
+                    ),
+                    InkWell(
+                      onTap: () => _showMonthPicker(context, _focusedDay),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          // Add a subtle background color on tap/hover logic is handled by InkWell splash, 
+                          // but we can add a default subtle border to hint interactivity
+                          border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              DateFormat('MMMM yyyy').format(_focusedDay),
+                              style: const TextStyle(
+                                fontSize: 18.0,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.indigo, // Use primary color to hint link/action
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.arrow_drop_down, color: Colors.indigo),
+                          ],
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right),
+                      onPressed: () {
+                        setState(() {
+                          _focusedDay = DateTime(_focusedDay.year, _focusedDay.month + 1);
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: TableCalendar(
+                  firstDay: DateTime.utc(2020, 1, 1),
+                  lastDay: DateTime.utc(
+                      DateTime.now().year + 5, 12, 31),
+                  focusedDay: _focusedDay,
+                  calendarFormat: CalendarFormat.month,
+                  selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+                  onDaySelected: _onDaySelected,
+                  eventLoader: _getEventsForDay,
+                  
+                  rowHeight: 65.0, 
+                  
 
-            // --- UPDATED: Header Tap opens Custom Month Picker ---
-            onHeaderTapped: (focusedDay) => _showMonthPicker(context, focusedDay),
+           
+           headerVisible: false,
 
             calendarBuilders: CalendarBuilders(
               markerBuilder: (context, day, events) {
                 if (events.isNotEmpty) {
                   final category = events[0] as Category;
                   return Container(
-                    width: 7,
-                    height: 7,
+                    width: 10,
+                    height: 10,
                     margin: const EdgeInsets.symmetric(horizontal: 1.5),
                     decoration: BoxDecoration(
                       color: category.color,
                       shape: BoxShape.circle,
+                      border: Border.all( //add border for better visibility
+                         color: Colors.white, 
+                           width: 1.0,
+                    ),
                     ),
                   );
                 }
@@ -200,6 +260,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
             ),
             calendarStyle: CalendarStyle(
               // Slightly reduced margin to ensure the visible target is larger within the increased row height
+              outsideDaysVisible: false,// Hide days from other months
               cellMargin: const EdgeInsets.all(6.0),
               todayDecoration: BoxDecoration(
                 color: Colors.deepOrange[300],
@@ -227,7 +288,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
             ),
             onPageChanged: (focusedDay) {
               _focusedDay = focusedDay;
-            },
+          },
+                  ),
+              ),
+            ],
           ),
         ),
       ),
