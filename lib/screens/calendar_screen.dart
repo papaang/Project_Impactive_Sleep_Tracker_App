@@ -64,7 +64,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
         MaterialPageRoute(
           builder: (_) => EventScreen(date: utcSelectedDay),
         ),
-      ).then((_) => _loadAllLogs());
+      ).then((_) {
+        _loadAllLogs();
+        _loadDayTypes();
+      });
     }
   }
 
