@@ -12,19 +12,38 @@ class SleepHeatmapScreen extends StatefulWidget {
 
 class _SleepHeatmapScreenState extends State<SleepHeatmapScreen> {
   final LogService _logService = LogService();
-  
+
   // Map Date -> Hours Slept
   Map<DateTime, double> _sleepData = {};
-  
+
   // Range (Initialize with safe defaults to prevent LateInitializationError)
   DateTime _endDate = DateTime.now();
   DateTime _startDate = DateTime.now().subtract(const Duration(days: 365));
-  
+
   bool _isLoading = true;
+
+  late ScrollController _scrollController;
+  int _currentYear = DateTime.now().year;
+  int _totalWeeks = 0;
+
+  void _onScroll() {
+    double scrollOffset = _scrollController.offset;
+    const double rowHeight = 32.0 + 6.0; // cellSize + gap
+    int topRow = (scrollOffset / rowHeight).floor();
+    int weekIndex = _totalWeeks - 1 - topRow;
+    if (weekIndex >= 0 && weekIndex < _totalWeeks) {
+      DateTime topWeekStart = _startDate.add(Duration(days: weekIndex * 7));
+      setState(() {
+        _currentYear = topWeekStart.year;
+      });
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    _scrollController = ScrollController();
+    _scrollController.addListener(_onScroll);
     // Default range: 1 Year relative to when screen opens
     _endDate = DateTime.now();
     _startDate = _endDate.subtract(const Duration(days: 365));
@@ -66,6 +85,7 @@ class _SleepHeatmapScreenState extends State<SleepHeatmapScreen> {
       setState(() {
         _sleepData = parsed;
         _isLoading = false;
+        _currentYear = _endDate.year;
       });
     }
   }
@@ -78,7 +98,7 @@ class _SleepHeatmapScreenState extends State<SleepHeatmapScreen> {
 
   void _onCellTap(DateTime date, double hours) {
     if (hours == 0) return;
-    
+
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -89,27 +109,33 @@ class _SleepHeatmapScreenState extends State<SleepHeatmapScreen> {
     );
   }
 
+  String _getWeekday(int index) {
+    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return weekdays[index];
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     // Calculate Grid Size only when data is ready
     int totalDays = _endDate.difference(_startDate).inDays + 1;
     int totalWeeks = (totalDays / 7).ceil();
-    
+    _totalWeeks = totalWeeks;
+
     // Constants
-    const double cellSize = 24.0;
-    const double gap = 4.0;
-    const double headerHeight = 30.0;
-    final double gridHeight = 7 * (cellSize + gap);
-    final double gridWidth = totalWeeks * (cellSize + gap);
+    const double cellSize = 32.0;
+    const double gap = 6.0;
+    const double labelWidth = 50.0;
+    final double gridHeight = totalWeeks * (cellSize + gap);
+    final double gridWidth = 7 * (cellSize + gap) + labelWidth;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Sleep Consistency'),
         centerTitle: true,
       ),
-      body: _isLoading 
+      body: _isLoading
         ? const Center(child: CircularProgressIndicator())
         : Builder(
             builder: (context) {
@@ -124,56 +150,78 @@ class _SleepHeatmapScreenState extends State<SleepHeatmapScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      "Long-term sleep duration trends. Tap a block for details.",
+                      "Long-term sleep duration trends.\nThis heatmap shows the sleep duration per day over the past year. Tap a block for details.",
                       style: TextStyle(color: Colors.grey[600], fontSize: 13),
                     ),
                     const SizedBox(height: 24),
-                    
+
+                    // --- LEGEND ---
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          "Year: $_currentYear",
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        Row(
+                          children: [
+                            const Text("0h", style: TextStyle(fontSize: 12, color: Colors.grey)),
+                            const SizedBox(width: 8),
+                            Container(
+                              width: 100, height: 12,
+                              margin: const EdgeInsets.symmetric(horizontal: 4),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [Colors.lightBlueAccent, Colors.greenAccent, Colors.orangeAccent, Colors.redAccent]
+                                ),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text("10h+", style: TextStyle(fontSize: 12, color: Colors.grey)),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
                     // --- HEATMAP CONTAINER ---
                     Expanded(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Column(
                         children: [
-                          // Y-AXIS LABELS (Fixed)
-                          Padding(
-                            padding: const EdgeInsets.only(top: headerHeight), // Align with grid rows
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.start,
-                              children: const [
-                                _DayLabel("Mon"),
-                                _DayLabel(""),
-                                _DayLabel("Wed"),
-                                _DayLabel(""),
-                                _DayLabel("Fri"),
-                                _DayLabel(""),
-                                _DayLabel("Sun"),
-                              ],
-                            ),
+                          // X-AXIS LABELS (Weekdays)
+                          Row(
+                            children: [
+                              SizedBox(width: labelWidth + gap * 2.5),
+                              for (int d = 0; d < 7; d++) _WeekdayLabel(_getWeekday(d)),
+                            ],
                           ),
-                          const SizedBox(width: 8),
-                          
+                          const SizedBox(height: 8),
+
                           // SCROLLABLE GRID
                           Expanded(
                             child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              reverse: true, // Start at the end (Today)
+                              controller: _scrollController,
+                              scrollDirection: Axis.vertical,
+                              reverse: false, // Start at the top (recent weeks)
                               child: SizedBox(
                                 width: gridWidth,
-                                height: gridHeight + headerHeight,
+                                height: gridHeight,
                                 child: GestureDetector(
                                   onTapUp: (details) {
                                     // Hit Test
-                                    
-                                    double y = details.localPosition.dy - headerHeight;
-                                    double x = details.localPosition.dx;
-                                    
-                                    if (y < 0) return; // Header tap
+                                    double x = details.localPosition.dx - labelWidth - (gap / 2);
+                                    double y = details.localPosition.dy;
+
+                                    if (x < 0) return; // Label area tap
 
                                     int col = (x / (cellSize + gap)).floor();
                                     int row = (y / (cellSize + gap)).floor();
-                                    
-                                    if (col >= 0 && col < totalWeeks && row >= 0 && row < 7) {
-                                      DateTime day = _startDate.add(Duration(days: col * 7 + row));
+
+                                    if (col >= 0 && col < 7 && row >= 0 && row < totalWeeks) {
+                                      // Since we paint from recent to past, row 0 is most recent
+                                      int weekIndex = totalWeeks - 1 - row;
+                                      DateTime day = _startDate.add(Duration(days: weekIndex * 7 + col));
                                       double hours = _sleepData[DateTime(day.year, day.month, day.day)] ?? 0;
                                       _onCellTap(day, hours);
                                     }
@@ -186,7 +234,7 @@ class _SleepHeatmapScreenState extends State<SleepHeatmapScreen> {
                                       isDark: isDark,
                                       cellSize: cellSize,
                                       gap: gap,
-                                      headerHeight: headerHeight
+                                      labelWidth: labelWidth
                                     ),
                                   ),
                                 ),
@@ -196,29 +244,7 @@ class _SleepHeatmapScreenState extends State<SleepHeatmapScreen> {
                         ],
                       ),
                     ),
-                    
-                    // --- LEGEND ---
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        const Text("Less", style: TextStyle(fontSize: 12, color: Colors.grey)),
-                        const SizedBox(width: 8),
-                        Container(
-                          width: 100, height: 12,
-                          margin: const EdgeInsets.symmetric(horizontal: 4),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Colors.lightBlueAccent, Colors.greenAccent, Colors.orangeAccent, Colors.redAccent]
-                            ),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        const Text("More", style: TextStyle(fontSize: 12, color: Colors.grey)),
-                      ],
-                    ),
-                    const SizedBox(height: 280),
+                    const SizedBox(height: 50),
                   ],
                 ),
               );
@@ -228,15 +254,17 @@ class _SleepHeatmapScreenState extends State<SleepHeatmapScreen> {
   }
 }
 
-class _DayLabel extends StatelessWidget {
+class _WeekdayLabel extends StatelessWidget {
   final String text;
-  const _DayLabel(this.text);
+  const _WeekdayLabel(this.text);
   @override
   Widget build(BuildContext context) {
-    // Height must match (cellSize + gap)
-    // 24 + 4 = 28
+    // Width must match (cellSize + gap)
+    // 32 + 6 = 38
+    // Height must match cellSize
     return SizedBox(
-      height: 28, 
+      width: 38,
+      height: 32,
       child: Center(child: Text(text, style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold))),
     );
   }
@@ -249,16 +277,16 @@ class CalendarHeatmapPainter extends CustomPainter {
   final bool isDark;
   final double cellSize;
   final double gap;
-  final double headerHeight;
+  final double labelWidth;
 
   CalendarHeatmapPainter({
-    required this.startDate, 
-    required this.totalWeeks, 
+    required this.startDate,
+    required this.totalWeeks,
     required this.data,
     required this.isDark,
     required this.cellSize,
     required this.gap,
-    required this.headerHeight,
+    required this.labelWidth,
   });
 
   // Helper to map 0..1 intensity to Thermal Gradient
@@ -284,27 +312,49 @@ class CalendarHeatmapPainter extends CustomPainter {
     final Paint paint = Paint()..style = PaintingStyle.fill;
     final TextPainter textPainter = TextPainter(textDirection: ui.TextDirection.ltr);
 
+    // Year Labels Logic
+    DateTime? lastYear;
+
     // Month Labels Logic
     DateTime? lastMonth;
 
     for (int w = 0; w < totalWeeks; w++) {
-      DateTime weekStart = startDate.add(Duration(days: w * 7));
-      
-      // Draw Month Label
-      if (lastMonth == null || weekStart.month != lastMonth.month) {
-        lastMonth = weekStart;
-        
+      // Paint from recent to past: w=0 is most recent, w=totalWeeks-1 is oldest
+      int weekIndex = totalWeeks - 1 - w;
+      DateTime weekStart = startDate.add(Duration(days: weekIndex * 7));
+
+      // Draw Year Label on the left
+      if (lastYear == null || weekStart.year != lastYear.year) {
+        lastYear = weekStart;
+
         textPainter.text = TextSpan(
-          text: DateFormat.MMM().format(weekStart),
+          text: DateFormat.y().format(weekStart),
           style: TextStyle(
-            color: isDark ? Colors.grey[400] : Colors.grey[700], 
-            fontSize: 12, 
+            color: isDark ? Colors.grey[400] : Colors.grey[700],
+            fontSize: 14,
             fontWeight: FontWeight.bold
           ),
         );
         textPainter.layout();
-        // Draw above grid
-        textPainter.paint(canvas, Offset(w * (cellSize + gap), 0));
+        // Draw year label above the first month of the year
+        textPainter.paint(canvas, Offset(0, w * (cellSize + gap) - 20));
+      }
+
+      // Draw Month Label on the left
+      if (lastMonth == null || weekStart.month != lastMonth.month) {
+        lastMonth = weekStart;
+
+        textPainter.text = TextSpan(
+          text: DateFormat.MMM().format(weekStart),
+          style: TextStyle(
+            color: isDark ? Colors.grey[400] : Colors.grey[700],
+            fontSize: 12,
+            fontWeight: FontWeight.bold
+          ),
+        );
+        textPainter.layout();
+        // Draw to the left of the grid
+        textPainter.paint(canvas, Offset(0, w * (cellSize + gap)));
       }
 
       // Draw 7 Days
@@ -313,19 +363,19 @@ class CalendarHeatmapPainter extends CustomPainter {
         // Normalize lookup key
         final key = DateTime(dayDate.year, dayDate.month, dayDate.day);
         double hours = data[key] ?? 0;
-        
+
         // Intensity: Normalize 0-10 hours range
         // Clamp at 10 hours = 1.0 (Red)
         double intensity = (hours / 10.0).clamp(0.0, 1.0);
-        
+
         paint.color = getColor(intensity);
 
-        double x = w * (cellSize + gap);
-        double y = headerHeight + d * (cellSize + gap);
+        double x = labelWidth + d * (cellSize + gap);
+        double y = w * (cellSize + gap);
 
         // Don't draw future days
         if (dayDate.isAfter(DateTime.now())) {
-            continue; 
+            continue;
         }
 
         RRect rect = RRect.fromRectAndRadius(
