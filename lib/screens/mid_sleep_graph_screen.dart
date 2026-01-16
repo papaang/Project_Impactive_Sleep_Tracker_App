@@ -108,25 +108,67 @@ class _MidSleepGraphScreenState extends State<MidSleepGraphScreen> {
                       padding: const EdgeInsets.all(16),
                       child: LayoutBuilder(
                         builder: (context, constraints) {
+                          // Calculate Y Range (Time)
+                          double minH = 24;
+                          double maxH = 0;
+
+                          // Use following to have dynamic Y range
+                          // _dataPoints.forEach((k, v) {
+                          //   if (v < minH) minH = v;
+                          //   if (v > maxH) maxH = v;
+                          // });
+
+                          // minH = (minH - 1).clamp(0, 24).floorToDouble();
+                          // maxH = (maxH + 1).clamp(0, 24).ceilToDouble();
+
+                          if (minH >= maxH) { minH = -12; maxH = 12; }
+
+                          final padding = 20.0; // Left padding for Y-labels
+                          final graphH = constraints.maxHeight - 20.0; // Bottom padding for X-labels
+
                           // Dynamic Width Logic for Scrolling
-                          double minWidth = constraints.maxWidth;
+                          double minWidth = constraints.maxWidth - padding;
                           double requiredWidth = sortedDates.length * 50.0; // 50px per data point
                           double finalWidth = max(minWidth, requiredWidth);
 
-                          return SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            reverse: true, // Start at newest data
-                            child: SizedBox(
-                              width: finalWidth,
-                              height: constraints.maxHeight,
-                              child: CustomPaint(
-                                painter: DriftGraphPainter(
-                                  dates: sortedDates,
-                                  data: _dataPoints,
-                                  isDark: isDark
+                          return Row(
+                            children: [
+                              // Fixed Y-axis
+                              SizedBox(
+                                width: padding,
+                                height: constraints.maxHeight,
+                                child: CustomPaint(
+                                  painter: YAxisPainter(
+                                    minH: minH,
+                                    maxH: maxH,
+                                    graphH: graphH,
+                                    isDark: isDark,
+                                  ),
                                 ),
                               ),
-                            ),
+                              // Scrollable graph
+                              Expanded(
+                                child: SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  reverse: true, // Start at newest data
+                                  child: SizedBox(
+                                    width: finalWidth,
+                                    height: constraints.maxHeight,
+                                    child: CustomPaint(
+                                      painter: GraphPainter(
+                                        dates: sortedDates,
+                                        data: _dataPoints,
+                                        isDark: isDark,
+                                        minH: minH,
+                                        maxH: maxH,
+                                        graphH: graphH,
+                                        padding: padding,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           );
                         }
                       ),
@@ -144,20 +186,27 @@ class _MidSleepGraphScreenState extends State<MidSleepGraphScreen> {
 
   Widget _buildStatsBox(bool isDark) {
     if (_dataPoints.isEmpty) return const SizedBox();
-    
+
     double sum = 0;
     int count = 0;
     _dataPoints.forEach((_, val) {
       sum += val;
       count++;
     });
-    
+
     if (count == 0) return const SizedBox();
-    
+
     double avg = sum / count;
     int h = avg.floor();
     int m = ((avg - h) * 60).round();
-    String timeStr = "${h.toString().padLeft(2,'0')}:${m.toString().padLeft(2,'0')}";
+
+    // Convert to 12-hour format with AM/PM
+    String period = h >= 12 ? 'AM' : 'PM';
+    if (h == 0) period = 'PM';
+    if (h == 24) period = 'PM';
+    int displayH = (h == 12) ? 0 : (h > 12 ? h - 12 : h);
+    if (h == 0) displayH = 12;
+    String timeStr = "${displayH.toString().padLeft(2,'0')}:${m.toString().padLeft(2,'0')} $period";
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -182,31 +231,76 @@ class _MidSleepGraphScreenState extends State<MidSleepGraphScreen> {
   }
 }
 
-class DriftGraphPainter extends CustomPainter {
-  final List<DateTime> dates;
-  final Map<DateTime, double> data;
+class YAxisPainter extends CustomPainter {
+  final double minH;
+  final double maxH;
+  final double graphH;
   final bool isDark;
 
-  DriftGraphPainter({required this.dates, required this.data, required this.isDark});
+  YAxisPainter({required this.minH, required this.maxH, required this.graphH, required this.isDark});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final padding = 40.0; // Left padding for Y-labels
-    final graphW = size.width - padding;
-    final graphH = size.height - 30.0; // Bottom padding for X-labels
+    final paintGrid = Paint()
+      ..color = Colors.grey.withAlpha(51)
+      ..strokeWidth = 1;
 
-    // Calculate Y Range (Time)
-    double minH = 24;
-    double maxH = 0;
-    
-    data.forEach((k, v) {
-      if (v < minH) minH = v;
-      if (v > maxH) maxH = v;
-    });
+    final textPainter = TextPainter(textDirection: ui.TextDirection.ltr);
 
-    minH = (minH - 1).clamp(0, 24);
-    maxH = (maxH + 1).clamp(0, 24);
-    if (minH >= maxH) { minH = 0; maxH = 12; }
+    int ySteps = (maxH - minH).ceil();
+    if (ySteps > 6) ySteps = 6;
+
+    for (int i = 0; i <= ySteps; i++) {
+      double val = minH + (i * (maxH - minH) / ySteps);
+      double y = graphH - ((val - minH) / (maxH - minH)) * graphH;
+      int hDisplay;
+
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paintGrid);
+
+      int h = val.floor();
+      int m = ((val - h) * 60).round();
+      if (h < 0) {
+        hDisplay = h + 24;
+      } else {
+        hDisplay = h;
+      }
+      String label = "${hDisplay.toString().padLeft(2,'0')}:${m.toString().padLeft(2,'0')}";
+
+      textPainter.text = TextSpan(
+        text: label,
+        style: TextStyle(color: Colors.grey, fontSize: 10),
+      );
+      textPainter.layout();
+      textPainter.paint(canvas, Offset(size.width - textPainter.width - 5, y - textPainter.height / 2));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+class GraphPainter extends CustomPainter {
+  final List<DateTime> dates;
+  final Map<DateTime, double> data;
+  final bool isDark;
+  final double minH;
+  final double maxH;
+  final double graphH;
+  final double padding;
+
+  GraphPainter({
+    required this.dates,
+    required this.data,
+    required this.isDark,
+    required this.minH,
+    required this.maxH,
+    required this.graphH,
+    required this.padding,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final graphW = size.width;
 
     final paintLine = Paint()
       ..color = Colors.indigoAccent
@@ -217,61 +311,50 @@ class DriftGraphPainter extends CustomPainter {
     final paintDot = Paint()
       ..color = isDark ? Colors.white : Colors.indigo
       ..style = PaintingStyle.fill;
-    
+
     final paintGrid = Paint()
       ..color = Colors.grey.withAlpha(51)
       ..strokeWidth = 1;
 
     final textPainter = TextPainter(textDirection: ui.TextDirection.ltr);
 
-    // 1. Draw Y-Axis Labels & Grid (Fixed on left of the scrollable area?)
-    // Actually, in a scrollable graph, typically Y-Axis is fixed and Graph scrolls.
-    // Here, simply drawing them on the canvas means they will scroll AWAY.
-    // For a simple implementation, we draw them on the canvas. 
-    // Ideally, this Painter should only draw the data, and Y-Axis should be a separate widget outside the ScrollView.
-    // However, sticking to the single-painter pattern for simplicity as requested, noting labels will scroll.
-    
+    // Draw horizontal grid lines extending into the graph area
     int ySteps = (maxH - minH).ceil();
-    if (ySteps > 6) ySteps = 6; 
-    
+    if (ySteps > 6) ySteps = 6;
+
     for (int i = 0; i <= ySteps; i++) {
       double val = minH + (i * (maxH - minH) / ySteps);
       double y = graphH - ((val - minH) / (maxH - minH)) * graphH;
 
-      canvas.drawLine(Offset(padding, y), Offset(size.width, y), paintGrid);
-
-      int h = val.floor();
-      int m = ((val - h) * 60).round();
-      String label = "${h.toString().padLeft(2,'0')}:${m.toString().padLeft(2,'0')}";
-      
-      textPainter.text = TextSpan(
-        text: label, 
-        style: TextStyle(color: Colors.grey, fontSize: 10),
-      );
-      textPainter.layout();
-      textPainter.paint(canvas, Offset(padding - textPainter.width - 5, y - textPainter.height / 2));
+      canvas.drawLine(Offset(0, y), Offset(graphW, y), paintGrid);
     }
 
-    // 2. Draw Data Line
+    // Draw Data Line
     Path path = Path();
     List<Offset> points = [];
 
     // Spacing is now based on dynamic width
     double stepX = graphW / (dates.length > 1 ? dates.length - 1 : 1);
-    
+
     for (int i = 0; i < dates.length; i++) {
       double val = data[dates[i]]!;
-      // X position is simply index * step
-      double x = padding + i * stepX;
+      double x = i * stepX;
+
+      // When midsleep is on previous day, e.g. 11pm, display as 1h before 
+      // midnight instead of 23h after midnight
+      if (val > 12) {
+        val = val - 24;
+      }
+
       double y = graphH - ((val - minH) / (maxH - minH)) * graphH;
-      
+
       points.add(Offset(x, y));
       if (i == 0) {
         path.moveTo(x, y);
       } else {
         path.lineTo(x, y);
       }
-      
+
       // Draw Date Labels
       textPainter.text = TextSpan(
         text: DateFormat('d/M').format(dates[i]),
