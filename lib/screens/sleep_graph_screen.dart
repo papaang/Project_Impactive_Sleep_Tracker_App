@@ -28,7 +28,7 @@ class _SleepGraphScreenState extends State<SleepGraphScreen> {
   double _baseScale = 1.0;
   double get _hourWidth => _baseHourWidth * _scale;
   double get _rowHeight => _baseRowHeight * _scale;
-  double get _graphWidth => _hourWidth * 25; 
+  double get _graphWidth => _hourWidth * 24; 
 
 
   final ScrollController _dateController = ScrollController();
@@ -90,8 +90,6 @@ class _SleepGraphScreenState extends State<SleepGraphScreen> {
        final date = today.subtract(Duration(days: i));
        final keyDate = DateTime(date.year, date.month, date.day);
 
-
-       
        DailyLog? foundLog;
        
        // 1. Try direct lookup first (fastest)
@@ -330,13 +328,12 @@ class GraphHeaderPainter extends CustomPainter {
     final linePaint = Paint()..color = Colors.grey.withAlpha(77)..strokeWidth = 1;
 
     // Grid runs 00:00 to 24:00 (Midnight to Midnight)
-    for (int i = 0; i <= 24; i++) {
+    for (int i = 0; i < 24; i++) {
       double x = i * hourWidth;
       
       // Draw Hour Label every 3 hours for clarity, or every hour if space permits
       if (i % 3 == 0) {
         String label = i.toString().padLeft(2, '0');
-        if (i == 24) label = "24"; 
         
         textPainter.text = TextSpan(
           text: label,
