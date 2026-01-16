@@ -18,6 +18,11 @@ class _StatsScreenState extends State<StatsScreen> {
   Map<DateTime, double> _weeklySleepData = {};
   bool _isLoading = true;
 
+  // Date range
+  late DateTime _startDate;
+  late DateTime _endDate;
+  bool _isCustom = false;
+
   // Statistics data
   List<double> _dailySleepHours = [];
   List<double> _sessionSleepHours = [];
@@ -27,6 +32,11 @@ class _StatsScreenState extends State<StatsScreen> {
   @override
   void initState() {
     super.initState();
+    // Set default to past 7 days
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    _startDate = today.subtract(const Duration(days: 6));
+    _endDate = today;
     _processSleepData();
   }
 
@@ -74,23 +84,65 @@ class _StatsScreenState extends State<StatsScreen> {
     return _calculateMean(minutesSinceMidnight) / 60.0; // Convert to hours
   }
 
+  Future<void> _selectDateRange() async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final DateTimeRange? picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      initialDateRange: DateTimeRange(start: _startDate, end: _endDate),
+      builder: (BuildContext context, Widget? child) {
+        return Theme(
+          data: isDark
+              ? Theme.of(context).copyWith(
+                  colorScheme: ColorScheme.dark(
+                    primary: Colors.indigo.shade600,
+                    onPrimary: Colors.white,
+                    secondary: Colors.indigo.shade400,
+                    surface: Colors.grey[800]!,
+                    onSurface: Colors.white,
+                  ),
+                )
+              : Theme.of(context),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      final days = picked.end.difference(picked.start).inDays + 1;
+      if (days > 32) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please select a date range under 1 month.')),
+        );
+      } else {
+        setState(() {
+          _startDate = picked.start;
+          _endDate = picked.end;
+          _isCustom = true;
+        });
+        _processSleepData();
+      }
+    }
+  }
+
   Future<void> _processSleepData() async {
     setState(() => _isLoading = true);
 
-    // We want to show the last 7 days
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final rangeStart = today.subtract(const Duration(days: 6));
+    // Use the selected date range
+    final rangeStart = _startDate;
+    final rangeEnd = _endDate;
+    final days = rangeEnd.difference(rangeStart).inDays + 1; // inclusive
 
     // We need to load logs starting from one day BEFORE the range,
     // because a sleep session starting yesterday might spill into today (the range start).
+    // Also load one day AFTER the range, because a sleep session starting on the last day might spill into the next day.
     final loadStart = rangeStart.subtract(const Duration(days: 1));
 
     // Helper map to aggregate hours per calendar date
     Map<DateTime, double> sleepBuckets = {};
 
     // Initialize buckets for the display range (0.0 hours default)
-    for (int i = 0; i < 7; i++) {
+    for (int i = 0; i < days; i++) {
       final d = rangeStart.add(Duration(days: i));
       sleepBuckets[d] = 0.0;
     }
@@ -101,8 +153,8 @@ class _StatsScreenState extends State<StatsScreen> {
     List<DateTime> bedTimes = [];
     List<DateTime> riseTimes = [];
 
-    // Load logs for the extended range (8 days total)
-    for (int i = 0; i < 8; i++) {
+    // Load logs for the extended range (days + 2 total: before, during, after)
+    for (int i = 0; i < days + 2; i++) {
       final date = loadStart.add(Duration(days: i));
       final log = await _logService.getDailyLog(date);
 
@@ -131,9 +183,9 @@ class _StatsScreenState extends State<StatsScreen> {
             sleepBuckets[startDate] = (sleepBuckets[startDate] ?? 0) + hours;
           }
 
-          // Collect session data only if session starts in the displayed week
+          // Collect session data only if session starts in the displayed range
           if (startDate.isAfter(rangeStart.subtract(const Duration(days: 1))) &&
-              startDate.isBefore(rangeStart.add(const Duration(days: 7)))) {
+              startDate.isBefore(rangeEnd.add(const Duration(days: 1)))) {
             sessionSleepHours.add(hours);
             bedTimes.add(entry.bedTime);
             riseTimes.add(entry.wakeTime);
@@ -175,9 +227,9 @@ class _StatsScreenState extends State<StatsScreen> {
             sleepBuckets[nextDayDate] = (sleepBuckets[nextDayDate] ?? 0) + hoursDay2;
           }
 
-          // Collect session data only if session starts in the displayed week
+          // Collect session data only if session starts in the displayed range
           if (startDate.isAfter(rangeStart.subtract(const Duration(days: 1))) &&
-              startDate.isBefore(rangeStart.add(const Duration(days: 7)))) {
+              startDate.isBefore(rangeEnd.add(const Duration(days: 1)))) {
             sessionSleepHours.add(hoursDay1 + hoursDay2);
             bedTimes.add(entry.bedTime);
             riseTimes.add(entry.wakeTime);
@@ -187,7 +239,7 @@ class _StatsScreenState extends State<StatsScreen> {
     }
 
     // Collect daily sleep hours for the range
-    for (int i = 0; i < 7; i++) {
+    for (int i = 0; i < days; i++) {
       final d = rangeStart.add(Duration(days: i));
       dailySleepHours.add(sleepBuckets[d] ?? 0.0);
     }
@@ -214,7 +266,15 @@ class _StatsScreenState extends State<StatsScreen> {
     final bgBarColor = isDark ? Colors.white10 : Colors.grey[200];
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Sleep Statistics')),
+      appBar: AppBar(
+        title: const Text('Sleep Statistics'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.calendar_today),
+            onPressed: _selectDateRange,
+          ),
+        ],
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Padding(
@@ -222,10 +282,26 @@ class _StatsScreenState extends State<StatsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    'Sleep Duration (Past 7 Days)',
-                    style: Theme.of(context).textTheme.titleLarge,
-                    textAlign: TextAlign.center,
+                  Column(
+                    children: [
+                      Text(
+                        'Sleep Duration',
+                        style: Theme.of(context).textTheme.titleLarge,
+                        textAlign: TextAlign.center,
+                      ),
+                      if (_isCustom)
+                        Text(
+                          '${DateFormat('MMM d').format(_startDate)} - ${DateFormat('MMM d').format(_endDate)}',
+                          style: const TextStyle(fontSize: 14),
+                          textAlign: TextAlign.center,
+                        )
+                      else
+                        const Text(
+                          '(Past 7 Days)',
+                          style: TextStyle(fontSize: 14),
+                          textAlign: TextAlign.center,
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 8),
                   const Text(
@@ -271,22 +347,43 @@ class _StatsScreenState extends State<StatsScreen> {
                               getTitlesWidget: (double value, TitleMeta meta) {
                                 final index = value.toInt();
                                 if (index >= 0 && index < _weeklySleepData.length) {
+                                  // Show labels for every 3 days if more than 20 days, every other day if more than 11 days
+                                  if (_weeklySleepData.length > 20) {
+                                    if (index % 3 != 0) {
+                                      return const SizedBox();
+                                    }
+                                  } else if (_weeklySleepData.length > 11 && index % 2 != 0) {
+                                    return const SizedBox();
+                                  }
                                   final date = _weeklySleepData.keys.elementAt(index);
                                   return Padding(
                                     padding: const EdgeInsets.only(top: 8.0),
-                                    child: Text(
-                                      DateFormat('E').format(date),
-                                      style: TextStyle(
-                                        color: isDark ? Colors.white70 : Colors.grey[600],
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
-                                      ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          DateFormat('E').format(date),
+                                          style: TextStyle(
+                                            color: isDark ? Colors.white70 : Colors.grey[600],
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                        Text(
+                                          DateFormat('d').format(date),
+                                          style: TextStyle(
+                                            color: isDark ? Colors.white38 : Colors.grey,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   );
                                 }
                                 return const SizedBox();
                               },
-                              reservedSize: 30,
+                              reservedSize: 50,
                             ),
                           ),
                           leftTitles: AxisTitles(
@@ -317,7 +414,7 @@ class _StatsScreenState extends State<StatsScreen> {
                               BarChartRodData(
                                 toY: hours,
                                 color: barColor,
-                                width: 16,
+                                width: _weeklySleepData.length > 20 ? 8 : 16,
                                 borderRadius: const BorderRadius.only(
                                   topLeft: Radius.circular(4),
                                   topRight: Radius.circular(4),
@@ -334,13 +431,13 @@ class _StatsScreenState extends State<StatsScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 4),
                   const Text(
                     'Hours of actual sleep per day',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.grey),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 18),
                   // Descriptive Statistics
                   Container(
                     padding: const EdgeInsets.all(16.0),
@@ -352,7 +449,9 @@ class _StatsScreenState extends State<StatsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Descriptive Statistics (Last 7 Days)',
+                          _isCustom
+                              ? 'Descriptive Statistics (${DateFormat('MMM d').format(_startDate)} - ${DateFormat('MMM d').format(_endDate)})'
+                              : 'Descriptive Statistics (Last 7 Days)',
                           style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
