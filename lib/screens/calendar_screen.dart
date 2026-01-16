@@ -193,13 +193,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           borderRadius: BorderRadius.circular(12),
                           // Add a subtle background color on tap/hover logic is handled by InkWell splash, 
                           // but we can add a default subtle border to hint interactivity
-                          border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                          border: Border.all(color: Colors.grey.withAlpha(40)),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              DateFormat('MMMM yyyy').format(_focusedDay),
+                              DateFormat('    MMMM yyyy').format(_focusedDay),
                               style: const TextStyle(
                                 fontSize: 18.0,
                                 fontWeight: FontWeight.bold,
