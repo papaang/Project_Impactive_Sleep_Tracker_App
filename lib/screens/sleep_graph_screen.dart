@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models.dart';
 import '../log_service.dart';
+import 'event_screen.dart';
 
 class SleepGraphScreen extends StatefulWidget {
   const SleepGraphScreen({super.key});
@@ -137,15 +138,27 @@ class _SleepGraphScreenState extends State<SleepGraphScreen> {
   Widget build(BuildContext context) {
     // Sort dates: Newest at Top (index 0).
     // Filtering to strictly show the requested range (excluding the buffer 'tomorrow' or 'yesterday+1' from list view)
-    final sortedKeys = _logs.keys.toList()..sort((a, b) => b.compareTo(a)); 
-    
+    final sortedKeys = _logs.keys.toList()..sort((a, b) => b.compareTo(a));
+
     // We want to show _daysToLoad starting from today (or latest available)
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    
+
     final displayDates = sortedKeys.where((d) => !d.isAfter(today.add(const Duration(days: 1)))).toList();
-    
+
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Adjust sizes for smallest scale
+    double dateColWidth = _dateColWidth;
+    double typeColWidth = _typeColWidth;
+    double dateFontSize = 15.0;
+    double dayFontSize = 16.0;
+    if (_scale == 0.5) {
+      dateColWidth = 35.0;
+      typeColWidth = 25.0;
+      dateFontSize = 11.0;
+      dayFontSize = 12.0;
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -170,7 +183,7 @@ class _SleepGraphScreenState extends State<SleepGraphScreen> {
             children: [
               // --- LEFT COLUMNS (FIXED) ---
               SizedBox(
-                width: _dateColWidth + _typeColWidth,
+                width: dateColWidth + typeColWidth,
                 child: Column(
                   children: [
                     // Header
@@ -179,8 +192,8 @@ class _SleepGraphScreenState extends State<SleepGraphScreen> {
                       color: Theme.of(context).scaffoldBackgroundColor,
                       child: Row(
                         children: [
-                          SizedBox(width: _dateColWidth, child: Center(child: Text("Date", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)))),
-                          SizedBox(width: _typeColWidth, child: Center(child: Text("Type", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)))),
+                          SizedBox(width: dateColWidth, child: Center(child: Text("Date", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)))),
+                          SizedBox(width: typeColWidth, child: Center(child: Text("Type", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)))),
                         ],
                       ),
                     ),
@@ -189,41 +202,49 @@ class _SleepGraphScreenState extends State<SleepGraphScreen> {
                     Expanded(
                       child: ListView.builder(
                         controller: _dateController, // Attached Controller
-                        physics: const ClampingScrollPhysics(), 
+                        physics: const ClampingScrollPhysics(),
                         itemCount: displayDates.length,
                         itemBuilder: (context, index) {
                           final date = displayDates[index];
                           final log = _logs[date];
                           final dayType = log != null && log.dayTypeId != null ? _dayTypes[log.dayTypeId] : null;
 
-                          return Container(
-                            height: _rowHeight,
-                            decoration: BoxDecoration(
-                              border: Border(bottom: BorderSide(color: Colors.grey.withAlpha(51))),
-                            ),
-                            child: Row(
-                              children: [
-                                // Date
-                                SizedBox(
-                                  width: _dateColWidth,
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(DateFormat('dd/MM').format(date), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                                      Text(DateFormat('EEE').format(date), style: const TextStyle(fontSize: 16, color: Colors.grey)),
-                                    ],
+                          return InkWell(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => EventScreen(date: date)),
+                              );
+                            },
+                            child: Container(
+                              height: _rowHeight,
+                              decoration: BoxDecoration(
+                                border: Border(bottom: BorderSide(color: Colors.grey.withAlpha(51))),
+                              ),
+                              child: Row(
+                                children: [
+                                  // Date
+                                  SizedBox(
+                                    width: dateColWidth,
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Text(DateFormat('dd/MM').format(date), style: TextStyle(fontWeight: FontWeight.bold, fontSize: dateFontSize)),
+                                        Text(DateFormat('EEE').format(date), style: TextStyle(fontSize: dayFontSize, color: Colors.grey)),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                                // Type Icon
-                                SizedBox(
-                                  width: _typeColWidth,
-                                  child: Center(
-                                    child: dayType != null 
-                                      ? Icon(dayType.icon, size: 20, color: dayType.color)
-                                      : Text("-", style: TextStyle(color: Colors.grey)),
+                                  // Type Icon
+                                  SizedBox(
+                                    width: typeColWidth,
+                                    child: Center(
+                                      child: dayType != null
+                                        ? Icon(dayType.icon, size: 20, color: dayType.color)
+                                        : Text("-", style: TextStyle(color: Colors.grey)),
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           );
                         },
@@ -503,10 +524,4 @@ class GraphRowPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
-}
-
-extension CanvasText on Canvas {
-  void drawText(TextPainter tp, Offset offset) {
-    tp.paint(this, offset);
-  }
 }
