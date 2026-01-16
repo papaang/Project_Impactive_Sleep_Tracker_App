@@ -827,6 +827,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             ).then((_) => _loadTodayLog());
                           },
                         ),
+                    _SquareButton(
+                          icon: Icons.event,
+                          label: "Today's Events",
+                          color: Colors.lightBlue,
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => EventScreen(date: _loadedDate)),
+                            ).then((_) => _loadTodayLog());
+                          },
+                        ),
                       ],
                     ),
 
