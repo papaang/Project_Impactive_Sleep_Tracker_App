@@ -31,7 +31,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
     'emoji_food_beverage': 'Food & Beverage',
     'local_drink': 'Drink',
     'wine_bar': 'Wine',
-    'add': 'Add',
+    'wb_sunny_outlined': 'Sunny',
   };
 
   static const Map<String, String> colorDisplayNames = {
@@ -46,6 +46,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
     '0xFF795548': 'Brown',
     '0xFF9C27B0': 'Pink',
     '0xFF000000': 'Black',
+    '0xFF607D8B': 'Blue Grey',
   };
 
   @override
@@ -119,7 +120,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
                   'emoji_food_beverage',
                   'local_drink',
                   'wine_bar',
-                  'add',
+                  'wb_sunny_outlined',
                 ].map((icon) => DropdownMenuItem(
                   value: icon,
                   child: Row(
@@ -148,6 +149,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
                   '0xFF795548', // brown
                   '0xFF9C27B0', // pink
                   '0xFF000000', // black
+                  '0xFF607D8B', // blue grey
                 ].map((color) => DropdownMenuItem(
                   value: color,
                   child: Row(
