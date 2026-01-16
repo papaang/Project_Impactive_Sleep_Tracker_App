@@ -18,12 +18,17 @@ class _SleepGraphScreenState extends State<SleepGraphScreen> {
   bool _isLoading = true;
   
   // Settings
-  final int _daysToLoad = 30; 
-  final double _rowHeight = 80.0; // Increased height for better stacking
-  final double _dateColWidth = 50.0;
+  
+  final double _baseRowHeight = 80.0;
+  final double _baseHourWidth = 60.0;
+
+  final double _dateColWidth = 70.0;
   final double _typeColWidth = 40.0;
-  final double _hourWidth = 60.0; // Increased width for better spacing
-  late final double _graphWidth; 
+  double _scale = 1.0;
+  double _baseScale = 1.0;
+  double get _hourWidth => _baseHourWidth * _scale;
+  double get _rowHeight => _baseRowHeight * _scale;
+  double get _graphWidth => _hourWidth * 25; 
 
 
   final ScrollController _dateController = ScrollController();
@@ -32,7 +37,6 @@ class _SleepGraphScreenState extends State<SleepGraphScreen> {
  @override
   void initState() {
     super.initState();
-    _graphWidth = _hourWidth * 25; // 24 hours + 1 buffer
     _loadData();
 
 
@@ -69,20 +73,65 @@ class _SleepGraphScreenState extends State<SleepGraphScreen> {
     final dayTypeList = await CategoryManager().getCategories('day_types');
     _dayTypes = {for (var t in dayTypeList) t.id: t};
 
-    Map<DateTime, DailyLog> loaded = {};
+    final allSavedLogs = await _logService.getAllLogs();
+    DateTime earliestDate = today.subtract(const Duration(days: 30)); 
+    if (allSavedLogs.isNotEmpty) {
+      final sortedSaved = allSavedLogs.keys.toList()..sort();
+      if (sortedSaved.first.isBefore(earliestDate)) {
+        final first = sortedSaved.first;
+        earliestDate = DateTime(first.year, first.month, first.day);
+      }
+    }
     
-    // Load last N days + 1 (to ensure we have the "next day" for the most recent row)
-    // Also load "tomorrow" (i = -1) just in case
-    for (int i = -1; i < _daysToLoad + 1; i++) {
-      final date = today.subtract(Duration(days: i));
-      final keyDate = DateTime(date.year, date.month, date.day);
-      final log = await _logService.getDailyLog(keyDate);
-      loaded[keyDate] = log;
+    Map<DateTime, DailyLog> continuousLogs = {};
+    int daysDiff = today.difference(earliestDate).inDays;
+    
+    for (int i = -1; i <= daysDiff; i++) {
+       final date = today.subtract(Duration(days: i));
+       final keyDate = DateTime(date.year, date.month, date.day);
+
+
+       
+       DailyLog? foundLog;
+       
+       // 1. Try direct lookup first (fastest)
+       if (allSavedLogs.containsKey(keyDate)) {
+         foundLog = allSavedLogs[keyDate];
+       } else {
+         // 2. Fallback: Search for a key with the same Y/M/D
+         for (var k in allSavedLogs.keys) {
+           if (k.year == keyDate.year && k.month == keyDate.month && k.day == keyDate.day) {
+             foundLog = allSavedLogs[k];
+             break;
+           }
+         }
+       }
+       // --- FIX ENDS HERE ---
+
+       if (foundLog != null) {
+         continuousLogs[keyDate] = foundLog;
+       } else {
+         continuousLogs[keyDate] = DailyLog(); // Empty log for gap
+       }
     }
 
+
     setState(() {
-      _logs = loaded;
+      _logs = continuousLogs;
       _isLoading = false;
+    });
+  }
+
+
+  void _zoomIn() {
+    setState(() {
+      _scale = (_scale + 0.25).clamp(0.5, 3.0);
+    });
+  }
+
+  void _zoomOut() {
+    setState(() {
+      _scale = (_scale - 0.25).clamp(0.5, 3.0);
     });
   }
 
@@ -96,7 +145,7 @@ class _SleepGraphScreenState extends State<SleepGraphScreen> {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     
-    final displayDates = sortedKeys.where((d) => !d.isAfter(today)).take(_daysToLoad).toList();
+    final displayDates = sortedKeys.where((d) => !d.isAfter(today.add(const Duration(days: 1)))).toList();
     
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -104,6 +153,18 @@ class _SleepGraphScreenState extends State<SleepGraphScreen> {
       appBar: AppBar(
         title: const Text('Sleep Progress Graph'),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.zoom_out),
+            onPressed: _zoomOut,
+            tooltip: "Zoom Out",
+          ),
+          IconButton(
+            icon: const Icon(Icons.zoom_in),
+            onPressed: _zoomIn,
+            tooltip: "Zoom In",
+          ),
+        ],
       ),
       body: _isLoading 
         ? const Center(child: CircularProgressIndicator())
@@ -150,8 +211,8 @@ class _SleepGraphScreenState extends State<SleepGraphScreen> {
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Text(DateFormat('dd/MM').format(date), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-                                      Text(DateFormat('EEE').format(date), style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                                      Text(DateFormat('dd/MM').format(date), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                      Text(DateFormat('EEE').format(date), style: const TextStyle(fontSize: 16, color: Colors.grey)),
                                     ],
                                   ),
                                 ),
@@ -178,7 +239,16 @@ class _SleepGraphScreenState extends State<SleepGraphScreen> {
 
               // --- RIGHT GRAPH (SCROLLABLE) ---
               Expanded(
-                child: SingleChildScrollView(
+                child: GestureDetector(
+                  onScaleStart: (details) {
+                    _baseScale = _scale;
+                  },
+                  onScaleUpdate: (details) {
+                    setState(() {
+                      _scale = (_baseScale * details.scale).clamp(0.5, 3.0);
+                    });
+                  },
+                  child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: SizedBox(
                     width: _graphWidth,
@@ -229,11 +299,12 @@ class _SleepGraphScreenState extends State<SleepGraphScreen> {
                                   ),
                                   size: Size(_graphWidth, _rowHeight),
                                 ),
-                              );
-                            },
+                                );
+                              },
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -389,7 +460,7 @@ class GraphRowPainter extends CustomPainter {
 
       textPainter.text = TextSpan(
         text: sym.text,
-        style: TextStyle(color: sym.color, fontWeight: FontWeight.bold, fontSize: 14),
+        style: TextStyle(color: sym.color, fontWeight: FontWeight.bold, fontSize: 20),
       );
       textPainter.layout();
 
@@ -399,9 +470,9 @@ class GraphRowPainter extends CustomPainter {
       bool placed = false;
       
       // Try vertical positions first (Center, Up, Down, Far Up, Far Down)
-      List<double> yOffsets = [0, -18, 18, -36, 36]; 
+      List<double> yOffsets = [0, -24, 24, -48, 48]; 
       // Try horizontal shift as fallback (Center, Right, Left)
-      List<double> xOffsets = [0, 12, -12];
+      List<double> xOffsets = [0, 16, -16];
 
       for (var dx in xOffsets) {
         for (var dy in yOffsets) {
