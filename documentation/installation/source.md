@@ -20,8 +20,9 @@ For help getting started with Flutter development, view the [online documentatio
 
 ## Steps to Use the Source Code
 
-1. **Fork or Clone the Repository**:
-   - Click "Fork" on GitHub to create your own copy, or clone the repository directly using Git: `git clone https://github.com/papaang/Project_Impactive_Sleep_Tracker_App.git`.
+1. **Get the source code**:
+   - Stable: Download the source folder from **Releases** section of this repository (usually found on the right-hand sidebar of the main page)
+   - Preview: Alternatively, click "Fork" on GitHub to create your own copy, or clone the repository directly using Git: `git clone https://github.com/papaang/Project_Impactive_Sleep_Tracker_App.git` to get the lastest version of the code.
    - For more details on forking and cloning, see [GitHub's Forking Guide](https://docs.github.com/en/get-started/quickstart/fork-a-repo).
 
 2. **Open the Project in VSCode**:

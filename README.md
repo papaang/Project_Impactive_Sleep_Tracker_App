@@ -5,7 +5,7 @@ A Flutter-based sleep tracking app designed for monitoring sleep patterns, loggi
 
 This project was developed as part of [Project Impactive](https://studentsunionucl.org/volunteering/organisation/project-impactive) and was co-created to meet the requirements of an individual with a circadian rhythm disorder, providing a tool to monitor sleep patterns beyond a paper sleep diary.
 
-This project will no longer actively be worked on from 19/01/2026, but can be used, distributed, adapted, and built upon under the terms of the [GPLv3 Licence](https://www.gnu.org/licenses/gpl-3.0.en.html#license-text) (LICENSE).
+This project will no longer actively be worked on from 19/01/2026, but can be used, distributed, adapted, and built upon under the terms of the [GPLv3 Licence](https://www.gnu.org/licenses/gpl-3.0.en.html#license-text) ([LICENSE](LICENSE)).
 <!-- ^ still need to add link to LICENSE file -->
 
 - [Key features](#key-features)
@@ -29,6 +29,7 @@ Please follow the Android App instructions to use the sleep tracker app.
 
 - [Installation instructions and requirements - Android App](documentation/installation/android.md)
 - [Installation instructions and requirements - Source Code (for devs)](documentation/installation/source.md)
+- [Deployment guide (for devs)](documentation/installation/deployment.md)
 
 > [!NOTE]  
 > This app was designed and tested for Android. iOS and other platforms may have limited functionality.

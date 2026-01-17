@@ -23,6 +23,7 @@ Built with Flutter for potential cross-platform compatibility, but primarily tes
 - Implement automatic backups of app data with Google Drive, OneDrive, etc. accounts.
 - Ability to edit sleep entries and drag-and-drop events from the classic sleep diary visualisation.
 - Ability to export the generated sleep diary as a multi-page PDF.
+- Time range adjustability for all visualisations
 - More appearance settings – ability to customise font style, font size, and more color themes.
 
 ## Documentation Contents

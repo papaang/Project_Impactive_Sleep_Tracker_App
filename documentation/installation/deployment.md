@@ -1,6 +1,6 @@
 # Deployment guide (for Developers)
 
-This guide provides step-by-step instructions on how to manually build and publish the latest version of the application.sing the `.apk` file.
+This guide provides step-by-step instructions on how to manually build and publish the latest version of the application using the `.apk` file.
 
 ## 1. Update the code
 
@@ -10,7 +10,7 @@ For Android to accept the new APK as an "Update," the new version must usually b
 2.  Find the line with the current version eg `version: 1.0.0+1`.
 3.  Change it to: `version: 1.0.1+2`.
 4.  In the `settings_screen.dart` find the line with the current version eg `label: const Text("Version 2.0.3"),`.
-5.  3.  Change it to: `label: const Text("Version 2.0.4"),`.
+5.  Change it to: `label: const Text("Version 2.0.4"),`.
 
 ## 2. How to to build an APK file.
 
