@@ -16,6 +16,7 @@ class _SleepGraphScreenState extends State<SleepGraphScreen> {
   final LogService _logService = LogService();
   Map<DateTime, DailyLog> _logs = {};
   Map<String, Category> _dayTypes = {};
+  Map<String, Category> _medicationTypes = {};
   bool _isLoading = true;
   
   // Settings
@@ -73,6 +74,10 @@ class _SleepGraphScreenState extends State<SleepGraphScreen> {
     // Load Day Types for lookup
     final dayTypeList = await CategoryManager().getCategories('day_types');
     _dayTypes = {for (var t in dayTypeList) t.id: t};
+
+    // Load Medication Types for lookup
+    final medicationTypeList = await CategoryManager().getCategories('medication_types');
+    _medicationTypes = {for (var t in medicationTypeList) t.id: t};
 
     final allSavedLogs = await _logService.getAllLogs();
     DateTime earliestDate = today.subtract(const Duration(days: 30)); 
@@ -132,6 +137,55 @@ class _SleepGraphScreenState extends State<SleepGraphScreen> {
     setState(() {
       _scale = (_scale - 0.25).clamp(0.5, 3.0);
     });
+  }
+
+  void _showSymbolDetails(BuildContext context, GraphSymbol symbol) {
+    String title = symbol.name ?? 'Event';
+    String details = '';
+    String timeText = 'Time: ${DateFormat('HH:mm').format(symbol.time)}';
+
+    if (symbol.icon != null) {
+      // Medication
+      if (symbol.dosage != null && symbol.dosage!.isNotEmpty) {
+        details = 'Dosage: ${symbol.dosage} mg';
+      }
+    } else {
+      if (symbol.text == 'C') {
+        // Caffeine
+        String dosageText = symbol.dosage != null && symbol.dosage!.isNotEmpty ? symbol.dosage! : '';
+        details = '$dosageText cup${int.tryParse(dosageText) != null ? (int.tryParse(dosageText)! > 1 ? 's' : '') : '(s)'}';
+      } else if (symbol.text == 'A') {
+        // Alcohol
+        String dosageText = symbol.dosage != null && symbol.dosage!.isNotEmpty ? symbol.dosage! : '';
+        details = '$dosageText drink${int.tryParse(dosageText) != null ? (int.tryParse(dosageText)! > 1 ? 's' : '') : '(s)'}';
+      } else if (symbol.text == 'E') {
+        // Exercise
+        String intensity = symbol.dosage ?? '';
+        details = intensity;
+        // For duration (start to end), we'd need to access the exercise entry, but for now, just show start time
+      }
+    }
+
+    final snackBar = SnackBar(
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          if (details.isNotEmpty)
+            Text(details, style: const TextStyle(fontSize: 14)),
+          Text(
+            timeText,
+            style: const TextStyle(fontSize: 14),
+          ),
+        ],
+      ),
+      duration: const Duration(seconds: 3),
+    );
+    ScaffoldMessenger.of(context).showSnackBar(snackBar);
   }
 
   @override
@@ -304,21 +358,52 @@ class _SleepGraphScreenState extends State<SleepGraphScreen> {
                               final nextDate = date.add(const Duration(days: 1));
                               if (_logs[nextDate] != null) rowLogs.add(_logs[nextDate]!);
 
+                              final rowPainter = GraphRowPainter(
+                                logs: rowLogs,
+                                rowDate: date,
+                                hourWidth: _hourWidth,
+                                isDark: isDark,
+                                medicationTypes: _medicationTypes,
+                                rowHeight: _rowHeight
+                              );
+                              final symbols = rowPainter.getSymbols();
+
                               return Container(
                                 height: _rowHeight,
                                 decoration: BoxDecoration(
                                   border: Border(bottom: BorderSide(color: Colors.grey.withAlpha(51))),
                                 ),
-                                child: CustomPaint(
-                                  painter: GraphRowPainter(
-                                    logs: rowLogs, 
-                                    rowDate: date,
-                                    hourWidth: _hourWidth,
-                                    isDark: isDark
-                                  ),
-                                  size: Size(_graphWidth, _rowHeight),
+                                child: Stack(
+                                  children: [
+                                    // Background
+                                    CustomPaint(
+                                      painter: GraphBackgroundPainter(
+                                        logs: rowLogs,
+                                        rowDate: date,
+                                        hourWidth: _hourWidth,
+                                        isDark: isDark
+                                      ),
+                                      size: Size(_graphWidth, _rowHeight),
+                                    ),
+                                    // Symbols
+                                    ...symbols.map((symbolData) {
+                                      return Positioned(
+                                        left: symbolData.x,
+                                        top: symbolData.y,
+                                        child: GestureDetector(
+                                          onTap: () => _showSymbolDetails(context, symbolData.symbol),
+                                          child: symbolData.symbol.icon != null
+                                            ? Icon(symbolData.symbol.icon, size: 24, color: symbolData.symbol.color)
+                                            : Text(
+                                                symbolData.symbol.text ?? '',
+                                                style: TextStyle(color: symbolData.symbol.color, fontWeight: FontWeight.bold, fontSize: 20),
+                                              ),
+                                        ),
+                                      );
+                                    }),
+                                  ],
                                 ),
-                                );
+                              );
                               },
                             ),
                           ),
@@ -351,11 +436,11 @@ class GraphHeaderPainter extends CustomPainter {
     // Grid runs 00:00 to 24:00 (Midnight to Midnight)
     for (int i = 0; i < 24; i++) {
       double x = i * hourWidth;
-      
+
       // Draw Hour Label every 3 hours for clarity, or every hour if space permits
       if (i % 3 == 0) {
         String label = i.toString().padLeft(2, '0');
-        
+
         textPainter.text = TextSpan(
           text: label,
           style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[700], fontSize: 10, fontWeight: FontWeight.bold),
@@ -363,7 +448,7 @@ class GraphHeaderPainter extends CustomPainter {
         textPainter.layout();
         textPainter.paint(canvas, Offset(x + (hourWidth - textPainter.width) / 2, size.height / 2 - textPainter.height / 2));
       }
-      
+
       // Vertical Grid Line (Header)
       if (i > 0) canvas.drawLine(Offset(x, 0), Offset(x, size.height), linePaint);
     }
@@ -373,20 +458,13 @@ class GraphHeaderPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-class _GraphSymbol {
-  final String text;
-  final DateTime time;
-  final Color color;
-  _GraphSymbol(this.text, this.time, this.color);
-}
-
-class GraphRowPainter extends CustomPainter {
-  final List<DailyLog> logs; 
+class GraphBackgroundPainter extends CustomPainter {
+  final List<DailyLog> logs;
   final DateTime rowDate;
   final double hourWidth;
   final bool isDark;
 
-  GraphRowPainter({required this.logs, required this.rowDate, required this.hourWidth, required this.isDark});
+  GraphBackgroundPainter({required this.logs, required this.rowDate, required this.hourWidth, required this.isDark});
 
   // Convert time to X position (relative to Midnight 00:00 on rowDate)
   double getX(DateTime time) {
@@ -409,9 +487,6 @@ class GraphRowPainter extends CustomPainter {
     // 2. Draw Events from ALL logs
     final sleepFillPaint = Paint()..style = PaintingStyle.fill..color = isDark ? Colors.indigoAccent.withAlpha(128) : Colors.indigo.withAlpha(77);
     final bedLinePaint = Paint()..style = PaintingStyle.stroke..strokeWidth = 3..color = isDark ? Colors.tealAccent : Colors.teal[700]!;
-    
-    // List to collect all symbols before drawing
-    List<_GraphSymbol> symbols = [];
 
     for (var log in logs) {
       // Draw Sleep Bars & Bed Time Lines
@@ -419,7 +494,7 @@ class GraphRowPainter extends CustomPainter {
         double startX = getX(entry.fellAsleepTime);
         double endX = getX(entry.wakeTime);
         double bedX = getX(entry.bedTime);
-        
+
         double minX = 0;
         double maxX = 24 * hourWidth;
 
@@ -432,70 +507,133 @@ class GraphRowPainter extends CustomPainter {
         if (endX > startX) {
           double l = startX.clamp(minX, maxX);
           double r = endX.clamp(minX, maxX);
-          
+
           if (r > l && (startX < maxX && endX > minX)) {
              canvas.drawRect(Rect.fromLTRB(l, 5, r, size.height - 5), sleepFillPaint);
           }
         }
       }
+    }
+  }
 
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+class GraphSymbol {
+  final IconData? icon;
+  final String? text;
+  final DateTime time;
+  final Color color;
+  final String? name;
+  final String? dosage;
+  GraphSymbol({this.icon, this.text, required this.time, required this.color, this.name, this.dosage});
+}
+
+class SymbolData {
+  final GraphSymbol symbol;
+  final double x;
+  final double y;
+  SymbolData(this.symbol, this.x, this.y);
+}
+
+class GraphRowPainter {
+  final List<DailyLog> logs;
+  final DateTime rowDate;
+  final double hourWidth;
+  final bool isDark;
+  final Map<String, Category> medicationTypes;
+  final double rowHeight;
+
+  GraphRowPainter({required this.logs, required this.rowDate, required this.hourWidth, required this.isDark, required this.medicationTypes, required this.rowHeight});
+
+  // Convert time to X position (relative to Midnight 00:00 on rowDate)
+  double getX(DateTime time) {
+    final midnight = DateTime(rowDate.year, rowDate.month, rowDate.day, 0, 0);
+    // Calculate difference in minutes from Midnight
+    int diff = time.difference(midnight).inMinutes;
+    return (diff / 60.0) * hourWidth;
+  }
+
+  List<SymbolData> getSymbols() {
+    List<GraphSymbol> symbols = [];
+
+    for (var log in logs) {
       // Collect Symbols
-      // Caffeine (C/A) - UPDATED LOGIC HERE
+      // Caffeine (C/A)
       for (var s in log.substanceLog) {
-        String code = "C"; 
-        // Check for 'alcohol' ID or legacy names
-        if (s.substanceTypeId == 'alcohol' || 
-            s.substanceTypeId.toLowerCase().contains('wine') || 
+        String code = "C";
+        String name = "Caffeine";
+        if (s.substanceTypeId == 'alcohol' ||
+            s.substanceTypeId.toLowerCase().contains('wine') ||
             s.substanceTypeId.toLowerCase().contains('beer')) {
              code = "A";
+             name = "Alcohol";
         }
         else if (s.substanceTypeId.toLowerCase().contains('cola')) {
-             code = "C"; // cola is caffeine
+             code = "C";
+             name = "Caffeine";
         }
-        
+
         Color c = code == "A" ? Colors.red : Colors.brown;
-        symbols.add(_GraphSymbol(code, s.time, c));
+        symbols.add(GraphSymbol(text: code, time: s.time, color: c, name: name, dosage: s.amount));
       }
 
-      // Medication (M)
+      // Medication
       for (var m in log.medicationLog) {
-        symbols.add(_GraphSymbol("M", m.time, Colors.green));
+        final medType = medicationTypes[m.medicationTypeId];
+        if (medType != null) {
+          symbols.add(GraphSymbol(icon: medType.icon, time: m.time, color: medType.color, name: medType.name, dosage: m.dosage));
+        } else {
+          symbols.add(GraphSymbol(text: "M", time: m.time, color: Colors.green, name: "Medication", dosage: m.dosage));
+        }
       }
 
-      // Exercise (E)
+      // Exercise
       for (var e in log.exerciseLog) {
-        symbols.add(_GraphSymbol("E", e.startTime, Colors.orange));
+        String exerciseName = "Exercise";
+        String exerciseDosage = e.type; // 'light', 'medium', 'heavy' -> 'Light', 'Medium', 'Heavy'
+        symbols.add(GraphSymbol(text: "E", time: e.startTime, color: Colors.orange, name: exerciseName, dosage: exerciseDosage));
       }
     }
 
-    // 3. Draw Symbols with Collision Detection
+    // Position symbols with collision detection
+    List<SymbolData> positionedSymbols = [];
+    List<Rect> drawnRects = [];
+
     final textPainter = TextPainter(textDirection: ui.TextDirection.ltr);
-    List<Rect> drawnRects = []; // To track bounding boxes of drawn text
 
     for (var sym in symbols) {
       double x = getX(sym.time);
       if (x < 0 || x > 24 * hourWidth) continue;
 
-      textPainter.text = TextSpan(
-        text: sym.text,
-        style: TextStyle(color: sym.color, fontWeight: FontWeight.bold, fontSize: 20),
-      );
-      textPainter.layout();
-
-      double w = textPainter.width;
-      double h = textPainter.height;
+      double w, h;
+      if (sym.icon != null) {
+        w = 24;
+        h = 24;
+      } else {
+        textPainter.text = TextSpan(
+          text: sym.text,
+          style: TextStyle(color: sym.color, fontWeight: FontWeight.bold, fontSize: 20),
+        );
+        textPainter.layout();
+        w = textPainter.width;
+        h = textPainter.height;
+      }
 
       bool placed = false;
-      
-      // Try vertical positions first (Center, Up, Down, Far Up, Far Down)
-      List<double> yOffsets = [0, -24, 24, -48, 48]; 
-      // Try horizontal shift as fallback (Center, Right, Left)
-      List<double> xOffsets = [0, 16, -16];
+
+      // Responsive yOffsets based on rowHeight
+      double yBaseOffset = rowHeight * 0.16;
+      double xBaseOffset = rowHeight * 0.24;
+      List<double> yOffsets = [0, -yBaseOffset, yBaseOffset, -yBaseOffset * 2, yBaseOffset * 2];
+      List<double> xOffsets = [0, xBaseOffset, -xBaseOffset, xBaseOffset * 2, -xBaseOffset * 2];
 
       for (var dx in xOffsets) {
         for (var dy in yOffsets) {
-          double y = size.height / 2 - h / 2 + dy;
-          Rect candidate = Rect.fromLTWH(x - w / 2 + dx, y, w, h); 
+          double y = rowHeight / 2 - h / 2 + dy;
+          double xOffset = x - w / 2 + dx;
+          Rect candidate = Rect.fromLTWH(xOffset, y, w, h);
 
           bool overlaps = false;
           for (var r in drawnRects) {
@@ -506,7 +644,7 @@ class GraphRowPainter extends CustomPainter {
           }
 
           if (!overlaps) {
-             canvas.drawText(textPainter, candidate.topLeft);
+             positionedSymbols.add(SymbolData(sym, candidate.left, candidate.top));
              drawnRects.add(candidate);
              placed = true;
              break;
@@ -514,14 +652,14 @@ class GraphRowPainter extends CustomPainter {
         }
         if (placed) break;
       }
-      
+
       if (!placed) {
-         double y = size.height / 2 - h / 2 + 36; 
-         canvas.drawText(textPainter, Offset(x - w / 2, y));
+         double y = rowHeight / 2 - h / 2 + yBaseOffset * 2.4; // fallback
+         double xOffset = x - w / 2;
+         positionedSymbols.add(SymbolData(sym, xOffset, y));
       }
     }
-  }
 
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+    return positionedSymbols;
+  }
 }
