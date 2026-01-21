@@ -44,7 +44,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
     '0xFFFF9800': 'Light Orange',
     '0xFFF44336': 'Red',
     '0xFF795548': 'Brown',
-    '0xFF9C27B0': 'Pink',
+    '0xFFFFC0CB': 'Pink',
     '0xFF000000': 'Black',
     '0xFF607D8B': 'Blue Grey',
   };
@@ -147,7 +147,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
                   '0xFFFF9800', // light orange
                   '0xFFF44336', // red
                   '0xFF795548', // brown
-                  '0xFF9C27B0', // pink
+                  '0xFFFFC0CB', // pink
                   '0xFF000000', // black
                   '0xFF607D8B', // blue grey
                 ].map((color) => DropdownMenuItem(
