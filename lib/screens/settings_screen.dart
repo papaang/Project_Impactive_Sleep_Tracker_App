@@ -98,7 +98,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   builder: (context, mode, child) {
                     final isDark = mode == ThemeMode.dark;
                     return Chip(
-                      label: const Text("Version 2.0.3"), //change that when updating
+                      label: const Text("Version 2.0.4"), // change that when updating
                       backgroundColor: Colors.indigo.withAlpha(25),
                       labelStyle: TextStyle(color: (isDark ? Colors.indigo[200] : Colors.indigo[800]), fontWeight: FontWeight.bold),
                     );
