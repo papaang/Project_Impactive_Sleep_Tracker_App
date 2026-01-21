@@ -146,7 +146,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           int sessions = log.sleepLog.length;
           double totalHours = log.totalSleepHours;
           if (sessions > 0) {
-            _sleepMessage = "Logged $sessions sleep session(s).\nTotal: ${_formatHoursToHHhMMm(totalHours)}";
+            _sleepMessage = "Logged $sessions sleep session${sessions > 1 ? 's' : ''}.\nTotal: ${_formatHoursToHHhMMm(totalHours)}";
           } else {
             _sleepMessage = "Welcome! Tap 'Going to sleep' to start.";
           }
@@ -769,12 +769,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     const SizedBox(height: 16),
                     
                     GridView.count(
-                      crossAxisCount: 2,
+                      crossAxisCount: (MediaQuery.of(context).size.width / 180).clamp(2, 4).toInt(),
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       mainAxisSpacing: 16,
                       crossAxisSpacing: 16,
-                      childAspectRatio: 1.0, 
+                      childAspectRatio: 1.0,
                       children: [
                         _SquareButton(
                           icon: Icons.medication_outlined,
@@ -858,7 +858,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     const SizedBox(height: 16),
 
                     GridView.count(
-                      crossAxisCount: 2,
+                      crossAxisCount: (MediaQuery.of(context).size.width / 180).clamp(2, 4).toInt(),
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       mainAxisSpacing: 16,
