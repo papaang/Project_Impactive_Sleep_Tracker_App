@@ -16,12 +16,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final LogService _logService = LogService();
   bool _isNotifEnabled = true;
   String _userName = '';
+  TimeOfDay? _sleepReminderTime;
 
   @override
   void initState() {
     super.initState();
     _isNotifEnabled = _logService.areNotificationsEnabled;
     _userName = _logService.userName;
+    _sleepReminderTime = _logService.sleepReminderTime;
   }
 
   Future<void> _launchGitHub() async {
@@ -98,7 +100,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   builder: (context, mode, child) {
                     final isDark = mode == ThemeMode.dark;
                     return Chip(
-                      label: const Text("Version 2.0.4"), // change that when updating
+                      label: const Text("Version 2.0.5"), // change that when updating
                       backgroundColor: Colors.indigo.withAlpha(25),
                       labelStyle: TextStyle(color: (isDark ? Colors.indigo[200] : Colors.indigo[800]), fontWeight: FontWeight.bold),
                     );
@@ -153,6 +155,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       NotificationService().showPersistentControls(isSleeping: false);
                     } else {
                       NotificationService().cancelAll();
+                    }
+                  },
+                ),
+              ),
+
+              // --- DAILY REMINDER SCHEDULE ---
+              Card(
+                child: ListTile(
+                  title: const Text("Daily Diary Reminder"),
+                  subtitle: Text(
+                      _sleepReminderTime == null
+                        ? "Schedule a daily reminder to log your sleep ✍🏻"
+                        : "Daily at ${_sleepReminderTime!.format(context)}",
+                    ),
+                  leading: const Icon(Icons.alarm),
+                  onTap: () async {
+                    final time = await showTimePicker(
+                    context: context,
+                    initialTime: _sleepReminderTime ?? const TimeOfDay(hour: 11, minute: 00),
+                    helpText: 'Select Daily Reminder Time',);
+
+                    if (time != null) {
+                      await _logService.setSleepReminderTime(time);
+
+                      await NotificationService().scheduleDailySleepDiaryReminder(
+                        hour: time.hour,
+                        minute: time.minute,
+                      );
+
+                      setState(() => _sleepReminderTime = time);
                     }
                   },
                 ),
