@@ -16,12 +16,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final LogService _logService = LogService();
   bool _isNotifEnabled = true;
   String _userName = '';
+  TimeOfDay? _sleepReminderTime;
 
   @override
   void initState() {
     super.initState();
     _isNotifEnabled = _logService.areNotificationsEnabled;
     _userName = _logService.userName;
+    _sleepReminderTime = _logService.sleepReminderTime;
   }
 
   Future<void> _launchGitHub() async {
@@ -65,6 +67,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+// --- HELPER METHOD ---
+  Future<void> _pickReminderTime() async {
+    final TimeOfDay? time = await showTimePicker(
+      context: context,
+      initialTime: _sleepReminderTime ?? const TimeOfDay(hour: 20, minute: 0),
+    );
+
+    if (time != null) {
+      // 1. Update UI
+      setState(() {
+        _sleepReminderTime = time;
+      });
+      // 2. Save to preferences
+      await _logService.setSleepReminderTime(time);
+
+      // 3. Schedule Notification
+      await NotificationService().scheduleDailySleepDiaryReminder(
+        hour: time.hour,
+        minute: time.minute,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Reminder set for ${time.format(context)}')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -98,7 +129,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   builder: (context, mode, child) {
                     final isDark = mode == ThemeMode.dark;
                     return Chip(
-                      label: const Text("Version 2.0.4"), // change that when updating
+                      label: const Text("Version 2.0.5"), // change that when updating
                       backgroundColor: Colors.indigo.withAlpha(25),
                       labelStyle: TextStyle(color: (isDark ? Colors.indigo[200] : Colors.indigo[800]), fontWeight: FontWeight.bold),
                     );
@@ -154,6 +185,44 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     } else {
                       NotificationService().cancelAll();
                     }
+                  },
+                ),
+              ),
+
+              // --- DAILY REMINDER SCHEDULE ---
+              Card(
+                child: ListTile(
+                  title: const Text("Daily Diary Reminder"),
+                  subtitle: Text(
+                    _sleepReminderTime == null
+                        ? "Schedule a daily reminder to log your sleep ✍🏻"
+                        : "Daily at ${_sleepReminderTime!.format(context)}",
+                  ),
+                  leading: Icon(
+                    Icons.alarm,
+                    color: _sleepReminderTime == null ? Colors.grey : Colors.indigo,
+                  ),
+                  // The Switch controls the On/Off state
+                  trailing: Switch(
+                    value: _sleepReminderTime != null,
+                    activeColor: Colors.indigoAccent,
+                    onChanged: (bool value) async {
+                      if (value) {
+                        // Turning ON: Open the picker immediately
+                        await _pickReminderTime();
+                      } else {
+                        // Turning OFF: Clear everything
+                        await NotificationService().cancelSleepDiaryReminder();
+                        await _logService.clearSleepReminderTime();
+                        setState(() {
+                          _sleepReminderTime = null;
+                        });
+                      }
+                    },
+                  ),
+                  // Tapping the tile also lets you edit the time
+                  onTap: () async {
+                    await _pickReminderTime();
                   },
                 ),
               ),
