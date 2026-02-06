@@ -67,6 +67,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+// --- HELPER METHOD ---
+  Future<void> _pickReminderTime() async {
+    final TimeOfDay? time = await showTimePicker(
+      context: context,
+      initialTime: _sleepReminderTime ?? const TimeOfDay(hour: 20, minute: 0),
+    );
+
+    if (time != null) {
+      // 1. Update UI
+      setState(() {
+        _sleepReminderTime = time;
+      });
+      // 2. Save to preferences
+      await _logService.setSleepReminderTime(time);
+
+      // 3. Schedule Notification
+      await NotificationService().scheduleDailySleepDiaryReminder(
+        hour: time.hour,
+        minute: time.minute,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Reminder set for ${time.format(context)}')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -165,38 +194,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: ListTile(
                   title: const Text("Daily Diary Reminder"),
                   subtitle: Text(
-                      _sleepReminderTime == null
+                    _sleepReminderTime == null
                         ? "Schedule a daily reminder to log your sleep ✍🏻"
                         : "Daily at ${_sleepReminderTime!.format(context)}",
-                    ),
-                  leading: const Icon(Icons.alarm),
+                  ),
+                  leading: Icon(
+                    Icons.alarm,
+                    color: _sleepReminderTime == null ? Colors.grey : Colors.indigo,
+                  ),
+                  // The Switch controls the On/Off state
+                  trailing: Switch(
+                    value: _sleepReminderTime != null,
+                    activeColor: Colors.indigoAccent,
+                    onChanged: (bool value) async {
+                      if (value) {
+                        // Turning ON: Open the picker immediately
+                        await _pickReminderTime();
+                      } else {
+                        // Turning OFF: Clear everything
+                        await NotificationService().cancelSleepDiaryReminder();
+                        await _logService.clearSleepReminderTime();
+                        setState(() {
+                          _sleepReminderTime = null;
+                        });
+                      }
+                    },
+                  ),
+                  // Tapping the tile also lets you edit the time
                   onTap: () async {
-                final TimeOfDay? time = await showTimePicker(
-                  context: context,
-                  initialTime: _sleepReminderTime ?? const TimeOfDay(hour: 20, minute: 0),
-                );
-
-                if (time != null) {
-                  // 1. Update UI
-                  setState(() {
-                    _sleepReminderTime = time;
-                  });
-                  // 2. Save to preferences
-                  await _logService.setSleepReminderTime(time);
-                  
-                  // 3. Schedule Notification
-                  await NotificationService().scheduleDailySleepDiaryReminder(
-                    hour: time.hour,
-                    minute: time.minute,
-                  );
-
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Reminder set for ${time.format(context)}')),
-                    );
-                  }
-                }
-              },
+                    await _pickReminderTime();
+                  },
                 ),
               ),
 

@@ -34,6 +34,11 @@ Future<void> setSleepReminderTime(TimeOfDay time) async {
   await _prefs.setInt('sleep_reminder_minute', time.minute);
 }
 
+Future<void> clearSleepReminderTime() async {
+    await _prefs.remove('sleep_reminder_hour');
+    await _prefs.remove('sleep_reminder_minute');
+  }
+
 TimeOfDay? get sleepReminderTime {
   final hour = _prefs.getInt('sleep_reminder_hour');
   final minute = _prefs.getInt('sleep_reminder_minute');
