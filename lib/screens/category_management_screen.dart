@@ -293,11 +293,9 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> wit
         Category(id: 'in_transit', name: 'In Transit', iconName: 'directions_car', colorHex: '0xFFEF6C00'),
       ];
       final defaultMedicationTypes = [
-        Category(id: 'melatonin', name: 'Melatonin', iconName: 'medication', colorHex: '0xFF2E7D32', defaultDosage: 50),
+        Category(id: 'melatonin', name: 'Melatonin', iconName: 'medication', colorHex: '0xFF2E7D32', defaultDosage: 2),
         Category(id: 'daridorexant', name: 'Daridorexant', iconName: 'medication', colorHex: '0xFF1565C0', defaultDosage: 50),
-        Category(id: 'sertraline', name: 'Sertraline', iconName: 'medication', colorHex: '0xFF7B1FA2', defaultDosage: 50),
-        Category(id: 'lisdexamfetamine', name: 'Lisdexamfetamine', iconName: 'medication', colorHex: '0xFFEF6C00', defaultDosage: 50),
-      ];
+        ];
       final defaultExerciseTypes = [
         Category(id: 'light', name: 'Light', iconName: 'directions_walk', colorHex: '0xFF4CAF50'),
         Category(id: 'medium', name: 'Medium', iconName: 'directions_run', colorHex: '0xFFFF9800'),

@@ -171,22 +171,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   leading: const Icon(Icons.alarm),
                   onTap: () async {
-                    final time = await showTimePicker(
-                    context: context,
-                    initialTime: _sleepReminderTime ?? const TimeOfDay(hour: 11, minute: 00),
-                    helpText: 'Select Daily Reminder Time',);
+                final TimeOfDay? time = await showTimePicker(
+                  context: context,
+                  initialTime: _sleepReminderTime ?? const TimeOfDay(hour: 20, minute: 0),
+                );
 
-                    if (time != null) {
-                      await _logService.setSleepReminderTime(time);
+                if (time != null) {
+                  // 1. Update UI
+                  setState(() {
+                    _sleepReminderTime = time;
+                  });
+                  // 2. Save to preferences
+                  await _logService.setSleepReminderTime(time);
+                  
+                  // 3. Schedule Notification
+                  await NotificationService().scheduleDailySleepDiaryReminder(
+                    hour: time.hour,
+                    minute: time.minute,
+                  );
 
-                      await NotificationService().scheduleDailySleepDiaryReminder(
-                        hour: time.hour,
-                        minute: time.minute,
-                      );
-
-                      setState(() => _sleepReminderTime = time);
-                    }
-                  },
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Reminder set for ${time.format(context)}')),
+                    );
+                  }
+                }
+              },
                 ),
               ),
 
