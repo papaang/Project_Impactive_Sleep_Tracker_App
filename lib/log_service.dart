@@ -26,6 +26,26 @@ class LogService {
   Future<void> setDarkMode(bool value) async {
     await _prefs.setBool('is_dark_mode', value);
   }
+
+// Add persistent time for daily reminder
+
+Future<void> setSleepReminderTime(TimeOfDay time) async {
+  await _prefs.setInt('sleep_reminder_hour', time.hour);
+  await _prefs.setInt('sleep_reminder_minute', time.minute);
+}
+
+Future<void> clearSleepReminderTime() async {
+    await _prefs.remove('sleep_reminder_hour');
+    await _prefs.remove('sleep_reminder_minute');
+  }
+
+TimeOfDay? get sleepReminderTime {
+  final hour = _prefs.getInt('sleep_reminder_hour');
+  final minute = _prefs.getInt('sleep_reminder_minute');
+  if (hour == null || minute == null) return null;
+  return TimeOfDay(hour: hour, minute: minute);
+}
+
 // --- USER NAME-----
   String get userName => _prefs.getString('user_name') ?? 'Patient';
 

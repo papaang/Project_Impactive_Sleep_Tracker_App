@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'models.dart';
 import 'log_service.dart';
 import 'screens/home_screen.dart';
+import 'notification_service.dart';
 
 // Global Theme Notifier to accessible from Settings
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
@@ -10,6 +11,11 @@ Future<void> initApp() async {
   WidgetsFlutterBinding.ensureInitialized();
   await LogService().init();
   await CategoryManager().init();
+  
+  // This ensures the system is ready to receive alarms immediately
+  await NotificationService().init((response) {
+      debugPrint("Notification Clicked: ${response.payload}");
+  });
   
   // Load saved theme preference
   if (LogService().isDarkMode) {
