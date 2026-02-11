@@ -453,7 +453,10 @@ This export contains your sleep tracking data in a structured folder format.
         // Determine File Type
         if (headers.contains('Bed Time') && headers.contains('Fell Asleep Time')) {
           importCount = await _importSleepLog(rows);
-        } else if (headers.contains('Medication Type') && headers.contains('Dosage')) {
+        } // Check for Main Daily Log (This was missing before, causing some imports to fail since users were selecting the main_daily_log.csv file)
+          else if (headers.contains('Day Type') && headers.contains('Notes')) {
+            importCount = await _importMainDailyLog(rows);
+        } else if (headers.contains('Medication Name') && headers.contains('Dosage')) {
           importCount = await _importMedicationLog(rows);
         } else if (headers.contains('Substance Type') && headers.contains('Amount')) {
           importCount = await _importSubstanceLog(rows);
@@ -619,6 +622,55 @@ This export contains your sleep tracking data in a structured folder format.
         }
       } catch (e) {
         debugPrint("Error import sleep row $i: $e");
+      }
+    }
+    return count;
+  }
+
+// Method to import main daily log (for restoring day types and notes, which are not in the other logs)
+  Future<int> _importMainDailyLog(List<List<dynamic>> rows) async {
+    int count = 0;
+    // Get all categories so we can match names (e.g. "Work") back to IDs (e.g. "work")
+    final dayTypes = await CategoryManager().getCategories('day_types');
+
+    // Start at i=1 to skip headers
+    for (int i = 1; i < rows.length; i++) {
+      var row = rows[i];
+      if (row.length < 2) continue; // Skip empty rows
+
+      try {
+        // 1. Parse Date (Column 0)
+        DateTime date = DateTime.parse(row[0].toString().trim());
+        DateTime utcDate = DateTime.utc(date.year, date.month, date.day);
+        
+        // 2. Get existing log or create new one
+        DailyLog log = await getDailyLog(utcDate);
+
+        // 3. Restore Day Type (Column 1)
+        String dayTypeName = row[1].toString().trim();
+        if (dayTypeName.isNotEmpty) {
+          // Find the ID that matches this name
+          final matchedCategory = dayTypes.where((c) => c.name.toLowerCase() == dayTypeName.toLowerCase()).firstOrNull;
+          if (matchedCategory != null) {
+            log.dayTypeId = matchedCategory.id;
+          }
+        }
+
+        // 4. Restore Notes (Column 8 based on your CSV structure)
+        // Header: Date, Day Type, Total Sleep, Latency, Awakenings, Awake Dur, Out Bed, Sessions, Notes
+        // Index:  0     1         2            3        4           5          6        7         8
+        if (row.length > 8) {
+          String notes = row[8].toString().trim();
+          if (notes.isNotEmpty) {
+            log.notes = notes;
+          }
+        }
+
+        // 5. Save
+        await saveDailyLog(utcDate, log);
+        count++;
+      } catch (e) {
+        debugPrint("Error importing main log row $i: $e");
       }
     }
     return count;

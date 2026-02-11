@@ -129,7 +129,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   builder: (context, mode, child) {
                     final isDark = mode == ThemeMode.dark;
                     return Chip(
-                      label: const Text("Version 2.0.5"), // change that when updating
+                      label: const Text("Version 2.0.6"), // change the version number when updating
                       backgroundColor: Colors.indigo.withAlpha(25),
                       labelStyle: TextStyle(color: (isDark ? Colors.indigo[200] : Colors.indigo[800]), fontWeight: FontWeight.bold),
                     );
@@ -205,7 +205,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   // The Switch controls the On/Off state
                   trailing: Switch(
                     value: _sleepReminderTime != null,
-                    activeColor: Colors.indigoAccent,
+                    activeThumbColor: Colors.indigoAccent,
                     onChanged: (bool value) async {
                       if (value) {
                         // Turning ON: Open the picker immediately
