@@ -71,7 +71,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _pickReminderTime() async {
     final TimeOfDay? time = await showTimePicker(
       context: context,
-      initialTime: _sleepReminderTime ?? const TimeOfDay(hour: 20, minute: 0),
+      initialTime: _sleepReminderTime ?? const TimeOfDay(hour: 08, minute: 45),
     );
 
     if (time != null) {
@@ -129,7 +129,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   builder: (context, mode, child) {
                     final isDark = mode == ThemeMode.dark;
                     return Chip(
-                      label: const Text("Version 2.0.6"), // change the version number when updating
+                      label: const Text("Version 2.1.0"), // change the version number when updating
                       backgroundColor: Colors.indigo.withAlpha(25),
                       labelStyle: TextStyle(color: (isDark ? Colors.indigo[200] : Colors.indigo[800]), fontWeight: FontWeight.bold),
                     );
@@ -252,12 +252,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(height: 12),
 
-              // --- CSV IMPORT ---
+              // --- USER DATA IMPORT ---
               OutlinedButton.icon(
                 icon: const Icon(Icons.upload_file),
-                label: const Text('Import Data from CSV'),
+                label: const Text('Import Data (CSV or ZIP)'), // Updated Label
                 onPressed: () async {
-                   await LogService().importFromCsv(context);
+                   // WAS: await LogService().importFromCsv(context);
+                   // NOW:
+                   await LogService().importData(context); 
                 },
               ),
               const SizedBox(height: 12),
