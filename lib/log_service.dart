@@ -199,35 +199,61 @@ TimeOfDay? get sleepReminderTime {
       //await mainFile.writeAsString(mainCsvData);
       
 
-      // 2. Sleep Log
+      // 2. Sleep Log (Updated: Explicit Dates + Sleep Location ID)
       List<List<dynamic>> sleepRows = [];
-      sleepRows.add(["Date", "Bed Time", "Fell Asleep Time", "Wake Time", "Out Of Bed Time", "Sleep Duration (Hrs)", "Sleep Latency Mins", "Awakenings Count", "Awake Duration Mins", "Sleep Location"]);
+      sleepRows.add([
+        "Date", "Bed Date", "Bed Time", "Fell Asleep Date", "Fell Asleep Time", 
+        "Wake Date", "Wake Time", "Out Of Bed Date", "Out Of Bed Time", 
+        "Sleep Duration (Hrs)", "Sleep Latency Mins", "Awakenings Count", 
+        "Awake Duration Mins", "Sleep Location"
+      ]);
+
       for (var date in sortedKeys) {
         final log = allLogs[date]!;
-        for (var entry in log.sleepLog) {
-          int totalMinutes = (entry.durationHours * 60).round();
-          int hrs = totalMinutes ~/ 60;
-          int mins = totalMinutes % 60;
-          String sleepDuration = "${hrs.toString().padLeft(2, '0')}:${mins.toString().padLeft(2, '0')}";
+        String dateStr = DateFormat('yyyy-MM-dd').format(date);
 
-          sleepRows.add([
-            DateFormat('yyyy-MM-dd').format(date),
-            DateFormat('HH:mm').format(entry.bedTime),
-            DateFormat('HH:mm').format(entry.fellAsleepTime),
-            DateFormat('HH:mm').format(entry.wakeTime),
-            entry.outOfBedTime != null ? DateFormat('HH:mm').format(entry.outOfBedTime!) : "",
-            sleepDuration,
-            entry.sleepLatencyMinutes,
-            entry.awakeningsCount,
-            entry.awakeDurationMinutes,
-            entry.sleepLocationDisplayName
-          ]);
+        for (var entry in log.sleepLog) {
+          String d(DateTime dt) => DateFormat('yyyy-MM-dd').format(dt);
+          String t(DateTime dt) => DateFormat('HH:mm').format(dt);
+
+          List<dynamic> row = [];
+          row.add(dateStr); // 0
+          
+          // Times
+          row.add(d(entry.bedTime)); // 1
+          row.add(t(entry.bedTime)); // 2
+          row.add(d(entry.fellAsleepTime)); // 3
+          row.add(t(entry.fellAsleepTime)); // 4
+          row.add(d(entry.wakeTime)); // 5
+          row.add(t(entry.wakeTime)); // 6
+          
+          if (entry.outOfBedTime != null) {
+            row.add(d(entry.outOfBedTime!)); // 7
+            row.add(t(entry.outOfBedTime!)); // 8
+          } else {
+            row.add("");
+            row.add("");
+          }
+
+          // Metrics
+          double duration = entry.wakeTime.difference(entry.fellAsleepTime).inMinutes / 60.0;
+          duration -= (entry.awakeDurationMinutes / 60.0);
+          int latency = entry.fellAsleepTime.difference(entry.bedTime).inMinutes;
+
+          row.add(duration.toStringAsFixed(2)); // 9
+          row.add(latency); // 10
+          row.add(entry.awakeningsCount); // 11
+          row.add(entry.awakeDurationMinutes); // 12
+          
+          // FIX: Export the ID (e.g., 'couch'), NOT the Name (e.g. 'Couch')
+          row.add(entry.sleepLocationId); // 13
+
+          sleepRows.add(row);
         }
       }
       String sleepCsvData = const ListToCsvConverter().convert(sleepRows);
       final sleepFile = File("${categoryLogsDir.path}/sleep_log.csv");
       await sleepFile.writeAsString(sleepCsvData);
-
 
       // 3. Substance Log
       List<List<dynamic>> substanceRows = [];
@@ -656,8 +682,17 @@ This export contains your sleep tracking data in a structured folder format.
     return count;
   }
 
-  Future<int> _importSleepLog(List<List<dynamic>> rows) async {
+Future<int> _importSleepLog(List<List<dynamic>> rows) async {
     int count = 0;
+    if (rows.isEmpty) return 0;
+
+    // Load Sleep Locations to fix the "Name vs ID" bug
+    final sleepLocations = await CategoryManager().getCategories('sleep_locations');
+
+    // Detect Format
+    final headers = rows.first.map((e) => e.toString().trim()).toList();
+    bool isNewFormat = headers.contains('Bed Date');
+
     for (int i = 1; i < rows.length; i++) {
       var row = rows[i];
       if (row.length < 5) continue;
@@ -665,42 +700,103 @@ This export contains your sleep tracking data in a structured folder format.
         DateTime date = DateTime.parse(row[0].toString().trim());
         DateTime utcDate = DateTime.utc(date.year, date.month, date.day);
         DailyLog log = await getDailyLog(utcDate);
-        
-        DateTime parseT(String t) {
+
+        SleepEntry newEntry;
+        String rawLocation = 'bed'; // Default
+
+        // --- SMART LOCATION LOOKUP ---
+        // Helper to Convert Name -> ID
+        String resolveLocationId(dynamic raw) {
+          String val = raw.toString().trim();
+          if (val.isEmpty) return 'bed';
+          
+          // 1. Try to find by ID (Exact match)
+          var match = sleepLocations.where((c) => c.id == val).firstOrNull;
+          if (match != null) return match.id;
+
+          // 2. Try to find by Name (Case-insensitive match for legacy files)
+          // e.g. CSV has "In Transit" -> matches category ID "transport"
+          match = sleepLocations.where((c) => c.name.toLowerCase() == val.toLowerCase()).firstOrNull;
+          if (match != null) return match.id;
+
+          // 3. Fallback: Use the value as-is (maybe it's a custom ID)
+          return val;
+        }
+
+        if (isNewFormat) {
+          // NEW FORMAT (Index 13 is Location)
+          DateTime parseDT(String d, String t) => DateTime.parse("${d.trim()} ${t.trim()}");
+
+          DateTime bed = parseDT(row[1].toString(), row[2].toString());
+          DateTime asleep = parseDT(row[3].toString(), row[4].toString());
+          DateTime wake = parseDT(row[5].toString(), row[6].toString());
+          
+          DateTime? out;
+          if (row.length > 8 && row[7].toString().trim().isNotEmpty && row[8].toString().trim().isNotEmpty) {
+             out = parseDT(row[7].toString(), row[8].toString());
+          }
+          
+          if (row.length > 13) rawLocation = row[13];
+
+          newEntry = SleepEntry(
+            bedTime: bed,
+            fellAsleepTime: asleep,
+            wakeTime: wake,
+            outOfBedTime: out,
+            sleepLocationId: resolveLocationId(rawLocation), // SMART LOOKUP
+            awakeningsCount: row.length > 11 ? _parseInt(row[11]) : 0,
+            awakeDurationMinutes: row.length > 12 ? _parseInt(row[12]) : 0,
+          );
+
+        } else {
+          // LEGACY FORMAT (Index 9 is Location)
+          DateTime makeDateTime(String t) {
              t = t.trim();
              if (t.isEmpty) return date; 
              final p = t.split(':');
              int h = int.parse(p[0]);
              int m = int.parse(p[1]);
-             DateTime dt = DateTime(date.year, date.month, date.day, h, m);
-             if (h < 16) {
-               dt = dt.add(const Duration(days: 1));
-             }
-             return dt;
+             return DateTime(date.year, date.month, date.day, h, m);
+          }
+
+          DateTime bed = makeDateTime(row[1].toString());
+          DateTime asleep = makeDateTime(row[2].toString());
+          DateTime wake = makeDateTime(row[3].toString());
+          DateTime? out = row[4].toString().trim().isNotEmpty ? makeDateTime(row[4].toString()) : null;
+
+          // Robust crossover logic
+          if (asleep.isBefore(bed)) {
+            asleep = asleep.add(const Duration(days: 1));
+          }
+          
+          while (wake.isBefore(asleep)) {
+            wake = wake.add(const Duration(days: 1));
+          }
+          
+          if (out != null) {
+            while (out!.isBefore(wake)) {
+              out = out.add(const Duration(days: 1));
+            }
+          }
+          
+          if (row.length > 9) rawLocation = row[9];
+
+          newEntry = SleepEntry(
+            bedTime: bed,
+            fellAsleepTime: asleep,
+            wakeTime: wake,
+            outOfBedTime: out,
+            sleepLocationId: resolveLocationId(rawLocation), // SMART LOOKUP
+            awakeningsCount: row.length > 7 ? _parseInt(row[7]) : 0,
+            awakeDurationMinutes: row.length > 8 ? _parseInt(row[8]) : 0,
+          );
         }
 
-        DateTime bed = parseT(row[1].toString());
-        DateTime asleep = parseT(row[2].toString());
-        DateTime wake = parseT(row[3].toString());
-        DateTime? out = row[4].toString().trim().isNotEmpty ? parseT(row[4].toString()) : null;
-
-        if (asleep.isBefore(bed)) asleep = asleep.add(const Duration(days: 1));
-        if (wake.isBefore(asleep)) wake = wake.add(const Duration(days: 1));
-        if (out != null && out.isBefore(wake)) out = out.add(const Duration(days: 1));
-
-        SleepEntry newEntry = SleepEntry(
-          bedTime: bed,
-          fellAsleepTime: asleep,
-          wakeTime: wake,
-          outOfBedTime: out,
-          sleepLocationId: row.length > 9 ? row[9].toString().trim() : 'bed', 
-          awakeningsCount: row.length > 7 ? _parseInt(row[7]) : 0,
-          awakeDurationMinutes: row.length > 8 ? _parseInt(row[8]) : 0,
-        );
-
+        // Deduplication
         bool exists = log.sleepLog.any((e) =>
-          _isSameMinute(e.bedTime, newEntry.bedTime) &&
-          _isSameMinute(e.wakeTime, newEntry.wakeTime)
+          e.bedTime.year == newEntry.bedTime.year &&
+          e.bedTime.minute == newEntry.bedTime.minute &&
+          e.wakeTime.minute == newEntry.wakeTime.minute
         );
 
         if (!exists) {
