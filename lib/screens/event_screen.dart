@@ -352,16 +352,21 @@ class _EventScreenState extends State<EventScreen> {
                 ..._log.sleepLog.asMap().entries.map((entry) {
                     int idx = entry.key;
                     SleepEntry sleep = entry.value;
+                    // Calculate difference between fellAsleepTime and wakeTime
+                    final double sleepDurationHours = sleep.wakeTime.difference(sleep.fellAsleepTime).inMinutes / 60.0;
+                    // Format to one decimal place
+                    final String durationText = sleepDurationHours.toStringAsFixed(1);
                     return Card(
                       margin: const EdgeInsets.symmetric(vertical: 6),
                       child: ListTile(
                         leading: Icon(Icons.king_bed_outlined, color: Colors.indigo[800]),
-                        title: Text("${_formatTime(sleep.bedTime)} - ${_formatTime(sleep.wakeTime)}"),
+                        title: Text("Slept from: ${_formatTime(sleep.fellAsleepTime)} - ${_formatTime(sleep.wakeTime)}"),
                         subtitle: Column(
                            crossAxisAlignment: CrossAxisAlignment.start,
                            children: [
-                             Text("Asleep: ${_formatTime(sleep.fellAsleepTime)}"),
-                             Text("Out: ${_formatTime(sleep.outOfBedTime ?? sleep.wakeTime)}"),
+                             Text("Duration: $durationText hours"),
+                             Text("Into bed: ${_formatTime(sleep.bedTime)}"),
+                             Text("Out of bed: ${_formatTime(sleep.outOfBedTime ?? sleep.wakeTime)}"),
                              if (sleep.awakeningsCount > 0)
                                Text("Awake: ${sleep.awakeDurationMinutes}m (${sleep.awakeningsCount}x)")
                            ]
