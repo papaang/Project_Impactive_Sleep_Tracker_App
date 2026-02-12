@@ -199,35 +199,61 @@ TimeOfDay? get sleepReminderTime {
       //await mainFile.writeAsString(mainCsvData);
       
 
-      // 2. Sleep Log
+      // 2. Sleep Log (Updated: Explicit Dates + Sleep Location ID)
       List<List<dynamic>> sleepRows = [];
-      sleepRows.add(["Date", "Bed Time", "Fell Asleep Time", "Wake Time", "Out Of Bed Time", "Sleep Duration (Hrs)", "Sleep Latency Mins", "Awakenings Count", "Awake Duration Mins", "Sleep Location"]);
+      sleepRows.add([
+        "Date", "Bed Date", "Bed Time", "Fell Asleep Date", "Fell Asleep Time", 
+        "Wake Date", "Wake Time", "Out Of Bed Date", "Out Of Bed Time", 
+        "Sleep Duration (Hrs)", "Sleep Latency Mins", "Awakenings Count", 
+        "Awake Duration Mins", "Sleep Location"
+      ]);
+
       for (var date in sortedKeys) {
         final log = allLogs[date]!;
-        for (var entry in log.sleepLog) {
-          int totalMinutes = (entry.durationHours * 60).round();
-          int hrs = totalMinutes ~/ 60;
-          int mins = totalMinutes % 60;
-          String sleepDuration = "${hrs.toString().padLeft(2, '0')}:${mins.toString().padLeft(2, '0')}";
+        String dateStr = DateFormat('yyyy-MM-dd').format(date);
 
-          sleepRows.add([
-            DateFormat('yyyy-MM-dd').format(date),
-            DateFormat('HH:mm').format(entry.bedTime),
-            DateFormat('HH:mm').format(entry.fellAsleepTime),
-            DateFormat('HH:mm').format(entry.wakeTime),
-            entry.outOfBedTime != null ? DateFormat('HH:mm').format(entry.outOfBedTime!) : "",
-            sleepDuration,
-            entry.sleepLatencyMinutes,
-            entry.awakeningsCount,
-            entry.awakeDurationMinutes,
-            entry.sleepLocationDisplayName
-          ]);
+        for (var entry in log.sleepLog) {
+          String d(DateTime dt) => DateFormat('yyyy-MM-dd').format(dt);
+          String t(DateTime dt) => DateFormat('HH:mm').format(dt);
+
+          List<dynamic> row = [];
+          row.add(dateStr); // 0
+          
+          // Times
+          row.add(d(entry.bedTime)); // 1
+          row.add(t(entry.bedTime)); // 2
+          row.add(d(entry.fellAsleepTime)); // 3
+          row.add(t(entry.fellAsleepTime)); // 4
+          row.add(d(entry.wakeTime)); // 5
+          row.add(t(entry.wakeTime)); // 6
+          
+          if (entry.outOfBedTime != null) {
+            row.add(d(entry.outOfBedTime!)); // 7
+            row.add(t(entry.outOfBedTime!)); // 8
+          } else {
+            row.add("");
+            row.add("");
+          }
+
+          // Metrics
+          double duration = entry.wakeTime.difference(entry.fellAsleepTime).inMinutes / 60.0;
+          duration -= (entry.awakeDurationMinutes / 60.0);
+          int latency = entry.fellAsleepTime.difference(entry.bedTime).inMinutes;
+
+          row.add(duration.toStringAsFixed(2)); // 9
+          row.add(latency); // 10
+          row.add(entry.awakeningsCount); // 11
+          row.add(entry.awakeDurationMinutes); // 12
+          
+          // FIX: Export the ID (e.g., 'couch'), NOT the Name (e.g. 'Couch')
+          row.add(entry.sleepLocationId); // 13
+
+          sleepRows.add(row);
         }
       }
       String sleepCsvData = const ListToCsvConverter().convert(sleepRows);
       final sleepFile = File("${categoryLogsDir.path}/sleep_log.csv");
       await sleepFile.writeAsString(sleepCsvData);
-
 
       // 3. Substance Log
       List<List<dynamic>> substanceRows = [];
@@ -429,67 +455,35 @@ This export contains your sleep tracking data in a structured folder format.
   }
 
   // ---------------------------------------------------------------------------
-  // --- IMPORT FROM CSV ---
+  // --- IMPORT DATA (CSV or ZIP) ---
   // ---------------------------------------------------------------------------
 
-  Future<void> importFromCsv(BuildContext context) async {
+  Future<void> importData(BuildContext context) async {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['csv'],
+        allowedExtensions: ['csv', 'zip'], // Allow ZIPs now!
       );
 
       if (result != null && result.files.single.path != null) {
         File file = File(result.files.single.path!);
-        final input = await file.readAsString();
-        // Remove 'eol' to allow auto-detection of \n or \r\n
-        final List<List<dynamic>> rows = const CsvToListConverter().convert(input);
-
-        if (rows.isEmpty) throw Exception("Empty file");
-
-        final headers = rows.first.map((e) => e.toString().trim()).toList();
+        String extension = result.files.single.extension?.toLowerCase() ?? '';
         int importCount = 0;
 
-        // Determine File Type
-        if (headers.contains('Bed Time') && headers.contains('Fell Asleep Time')) {
-          importCount = await _importSleepLog(rows);
-        } // Check for Main Daily Log (This was missing before, causing some imports to fail since users were selecting the main_daily_log.csv file)
-          else if (headers.contains('Day Type') && headers.contains('Notes')) {
-            importCount = await _importMainDailyLog(rows);
-        } else if (headers.contains('Medication Name') && headers.contains('Dosage')) {
-          importCount = await _importMedicationLog(rows);
-        } else if (headers.contains('Substance Type') && headers.contains('Amount')) {
-          importCount = await _importSubstanceLog(rows);
-        } else if (headers.contains('Exercise Type')) { // 'Duration Mins' might not be in some exports
-          importCount = await _importExerciseLog(rows);}
-          else if (headers.contains('iconName') && headers.contains('colorHex')) {
-            String fileName = file.uri.pathSegments.last.toLowerCase();
-            String? categoryType;
-           
-            if (fileName.contains('day_type')) {
-              categoryType = 'day_types';
-            } else if (fileName.contains('sleep_location')) {
-              categoryType = 'sleep_locations';
-            } else if (fileName.contains('medication_type')) {
-              categoryType = 'medication_types';
-            } else if (fileName.contains('exercise_type')) {
-              categoryType = 'exercise_types';
-            } else if (fileName.contains('substance_type')) {
-              categoryType = 'substance_types';
-            }
-
-            if (categoryType != null) {
-                importCount = await _importUserCategories(rows, categoryType);
-            } else {
-                throw Exception("Could not determine category type from filename '${file.uri.pathSegments.last}'. Please use files like 'day_types.csv'.");
-            }
-        } else {
-          throw Exception("Unknown CSV format. Please import sleep_log.csv, medication_log.csv, etc.");
+        // 1. Handle ZIP Import
+        if (extension == 'zip') {
+          importCount = await _importFromZip(file);
+        } 
+        // 2. Handle Single CSV Import
+        else if (extension == 'csv') {
+          final input = await file.readAsString();
+          final List<List<dynamic>> rows = const CsvToListConverter().convert(input);
+          importCount = await _dispatchImport(rows, file.uri.pathSegments.last);
         }
 
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Imported $importCount new entries.')),
+            SnackBar(content: Text('Import complete. Processed $importCount entries.')),
           );
         }
       }
@@ -502,27 +496,160 @@ This export contains your sleep tracking data in a structured folder format.
     }
   }
 
-  // --- Helper: Same Minute Check for Deduplication ---
+  // --- ZIP HANDLER ---
+  Future<int> _importFromZip(File zipFile) async {
+    int count = 0;
+    final bytes = await zipFile.readAsBytes();
+    final archive = ZipDecoder().decodeBytes(bytes);
+
+    // We must separate files to ensure Categories are imported BEFORE Logs
+    final List<ArchiveFile> categoryFiles = [];
+    final List<ArchiveFile> logFiles = [];
+
+    for (final file in archive) {
+      if (!file.isFile) continue;
+      final filename = file.name.toLowerCase();
+      if (!filename.endsWith('.csv')) continue;
+
+      // Identify Category definitions
+      if (filename.contains('day_types') || 
+          filename.contains('sleep_locations') || 
+          filename.contains('medication_types') || 
+          filename.contains('exercise_types') || 
+          filename.contains('substance_types')) {
+        categoryFiles.add(file);
+      } else {
+        logFiles.add(file);
+      }
+    }
+
+    // PHASE 1: Import Categories
+    for (final file in categoryFiles) {
+      count += await _processArchiveFile(file);
+    }
+
+    // PHASE 2: Import Logs
+    for (final file in logFiles) {
+      count += await _processArchiveFile(file);
+    }
+
+    return count;
+  }
+
+  Future<int> _processArchiveFile(ArchiveFile file) async {
+    try {
+      final content = utf8.decode(file.content as List<int>);
+      final rows = const CsvToListConverter().convert(content);
+      return await _dispatchImport(rows, file.name);
+    } catch (e) {
+      debugPrint("Error processing zip file ${file.name}: $e");
+      return 0;
+    }
+  }
+
+  // --- THE BOUNCER (Dispatcher) ---
+  // Decides which import method to use based on headers
+  Future<int> _dispatchImport(List<List<dynamic>> rows, String filename) async {
+    if (rows.isEmpty) return 0;
+    final headers = rows.first.map((e) => e.toString().trim()).toList();
+
+    // 1. Main Daily Log (FIXED: Added this check)
+    if (headers.contains('Day Type') && headers.contains('Notes')) {
+      return await _importMainDailyLog(rows);
+    }
+    // 2. Sleep Log
+    else if (headers.contains('Bed Time') && headers.contains('Fell Asleep Time')) {
+      return await _importSleepLog(rows);
+    } 
+    // 3. Medication Log (FIXED: Checks 'Medication Name' OR 'Medication Type')
+    else if ((headers.contains('Medication Name') || headers.contains('Medication Type')) && headers.contains('Dosage')) {
+      return await _importMedicationLog(rows);
+    } 
+    // 4. Substance Log
+    else if (headers.contains('Substance Type') && headers.contains('Amount')) {
+      return await _importSubstanceLog(rows);
+    } 
+    // 5. Exercise Log
+    else if (headers.contains('Exercise Type')) { 
+      return await _importExerciseLog(rows);
+    }
+    // 6. User Categories (Fallback to filename check)
+    else if (headers.contains('iconName') && headers.contains('colorHex')) {
+      String name = filename.toLowerCase();
+      if (name.contains('day_type')) return await _importUserCategories(rows, 'day_types');
+      if (name.contains('sleep_location')) return await _importUserCategories(rows, 'sleep_locations');
+      if (name.contains('medication_type')) return await _importUserCategories(rows, 'medication_types');
+      if (name.contains('exercise_type')) return await _importUserCategories(rows, 'exercise_types');
+      if (name.contains('substance_type')) return await _importUserCategories(rows, 'substance_types');
+    }
+    
+    return 0;
+  }
+
+  // --- IMPORTERS ---
+
+  // NEW: Main Daily Log Importer
+  Future<int> _importMainDailyLog(List<List<dynamic>> rows) async {
+    int count = 0;
+    final dayTypes = await CategoryManager().getCategories('day_types');
+
+    for (int i = 1; i < rows.length; i++) {
+      var row = rows[i];
+      if (row.length < 2) continue;
+
+      try {
+        DateTime date = DateTime.parse(row[0].toString().trim());
+        DateTime utcDate = DateTime.utc(date.year, date.month, date.day);
+        DailyLog log = await getDailyLog(utcDate);
+
+        // Restore Day Type
+        String dayTypeName = row[1].toString().trim();
+        if (dayTypeName.isNotEmpty) {
+          // Fix: Use .where().firstOrNull for Dart 3 compatibility
+          final matchedCategory = dayTypes.where(
+            (c) => c.name.toLowerCase() == dayTypeName.toLowerCase()
+          ).firstOrNull;
+          
+          if (matchedCategory != null) {
+            log.dayTypeId = matchedCategory.id;
+          }
+        }
+
+        // Restore Notes (Index 8 in export structure)
+        if (row.length > 8) {
+          String notes = row[8].toString().trim();
+          if (notes.isNotEmpty) log.notes = notes;
+        }
+
+        await saveDailyLog(utcDate, log);
+        count++;
+      } catch (e) {
+        debugPrint("Error importing main log row $i: $e");
+      }
+    }
+    return count;
+  }
+
+  // Helper: Same Minute Check for Deduplication
   bool _isSameMinute(DateTime a, DateTime b) {
     return a.year == b.year && a.month == b.month && a.day == b.day &&
            a.hour == b.hour && a.minute == b.minute;
   }
 
-  // Helper to safely parse numbers from CSV (which might be strings or ints)
   int _parseInt(dynamic val) {
     if (val == null) return 0;
     if (val is int) return val;
     if (val is double) return val.toInt();
     return int.tryParse(val.toString().trim()) ?? 0;
   }
-   Future<int> _importUserCategories(List<List<dynamic>> rows, String categoryType) async {
+
+  Future<int> _importUserCategories(List<List<dynamic>> rows, String categoryType) async {
     int count = 0;
     List<Category> existing = await CategoryManager().getCategories(categoryType);
     
-    // Skip header (i=1)
     for (int i = 1; i < rows.length; i++) {
       var row = rows[i];
-      if (row.length < 4) continue; // id, name, icon, color required
+      if (row.length < 4) continue; 
       
       try {
         String id = row[0].toString().trim();
@@ -534,7 +661,6 @@ This export contains your sleep tracking data in a structured folder format.
            defaultDosage = int.tryParse(row[4].toString().trim());
         }
 
-        // Deduplicate by ID
         if (!existing.any((c) => c.id == id)) {
            existing.add(Category(
              id: id,
@@ -556,8 +682,17 @@ This export contains your sleep tracking data in a structured folder format.
     return count;
   }
 
-  Future<int> _importSleepLog(List<List<dynamic>> rows) async {
+Future<int> _importSleepLog(List<List<dynamic>> rows) async {
     int count = 0;
+    if (rows.isEmpty) return 0;
+
+    // Load Sleep Locations to fix the "Name vs ID" bug
+    final sleepLocations = await CategoryManager().getCategories('sleep_locations');
+
+    // Detect Format
+    final headers = rows.first.map((e) => e.toString().trim()).toList();
+    bool isNewFormat = headers.contains('Bed Date');
+
     for (int i = 1; i < rows.length; i++) {
       var row = rows[i];
       if (row.length < 5) continue;
@@ -565,54 +700,103 @@ This export contains your sleep tracking data in a structured folder format.
         DateTime date = DateTime.parse(row[0].toString().trim());
         DateTime utcDate = DateTime.utc(date.year, date.month, date.day);
         DailyLog log = await getDailyLog(utcDate);
-        
-        DateTime parseT(String t) {
+
+        SleepEntry newEntry;
+        String rawLocation = 'bed'; // Default
+
+        // --- SMART LOCATION LOOKUP ---
+        // Helper to Convert Name -> ID
+        String resolveLocationId(dynamic raw) {
+          String val = raw.toString().trim();
+          if (val.isEmpty) return 'bed';
+          
+          // 1. Try to find by ID (Exact match)
+          var match = sleepLocations.where((c) => c.id == val).firstOrNull;
+          if (match != null) return match.id;
+
+          // 2. Try to find by Name (Case-insensitive match for legacy files)
+          // e.g. CSV has "In Transit" -> matches category ID "transport"
+          match = sleepLocations.where((c) => c.name.toLowerCase() == val.toLowerCase()).firstOrNull;
+          if (match != null) return match.id;
+
+          // 3. Fallback: Use the value as-is (maybe it's a custom ID)
+          return val;
+        }
+
+        if (isNewFormat) {
+          // NEW FORMAT (Index 13 is Location)
+          DateTime parseDT(String d, String t) => DateTime.parse("${d.trim()} ${t.trim()}");
+
+          DateTime bed = parseDT(row[1].toString(), row[2].toString());
+          DateTime asleep = parseDT(row[3].toString(), row[4].toString());
+          DateTime wake = parseDT(row[5].toString(), row[6].toString());
+          
+          DateTime? out;
+          if (row.length > 8 && row[7].toString().trim().isNotEmpty && row[8].toString().trim().isNotEmpty) {
+             out = parseDT(row[7].toString(), row[8].toString());
+          }
+          
+          if (row.length > 13) rawLocation = row[13];
+
+          newEntry = SleepEntry(
+            bedTime: bed,
+            fellAsleepTime: asleep,
+            wakeTime: wake,
+            outOfBedTime: out,
+            sleepLocationId: resolveLocationId(rawLocation), // SMART LOOKUP
+            awakeningsCount: row.length > 11 ? _parseInt(row[11]) : 0,
+            awakeDurationMinutes: row.length > 12 ? _parseInt(row[12]) : 0,
+          );
+
+        } else {
+          // LEGACY FORMAT (Index 9 is Location)
+          DateTime makeDateTime(String t) {
              t = t.trim();
              if (t.isEmpty) return date; 
              final p = t.split(':');
-             // Handle "8:05" vs "08:05"
              int h = int.parse(p[0]);
              int m = int.parse(p[1]);
-             
-             // Construct on log date initially
-             DateTime dt = DateTime(date.year, date.month, date.day, h, m);
-             
-             // Heuristic: If time is between 00:00 and 16:00 (4pm), assume it belongs to Next Day
-             // This is because the Log Date represents the "Night Of".
-             // E.g. Log Date: Nov 22. Bed Time: 01:00 (am). This means Nov 23 01:00.
-             if (h < 16) {
-               dt = dt.add(const Duration(days: 1));
-             }
-             return dt;
+             return DateTime(date.year, date.month, date.day, h, m);
+          }
+
+          DateTime bed = makeDateTime(row[1].toString());
+          DateTime asleep = makeDateTime(row[2].toString());
+          DateTime wake = makeDateTime(row[3].toString());
+          DateTime? out = row[4].toString().trim().isNotEmpty ? makeDateTime(row[4].toString()) : null;
+
+          // Robust crossover logic
+          if (asleep.isBefore(bed)) {
+            asleep = asleep.add(const Duration(days: 1));
+          }
+          
+          while (wake.isBefore(asleep)) {
+            wake = wake.add(const Duration(days: 1));
+          }
+          
+          if (out != null) {
+            while (out!.isBefore(wake)) {
+              out = out.add(const Duration(days: 1));
+            }
+          }
+          
+          if (row.length > 9) rawLocation = row[9];
+
+          newEntry = SleepEntry(
+            bedTime: bed,
+            fellAsleepTime: asleep,
+            wakeTime: wake,
+            outOfBedTime: out,
+            sleepLocationId: resolveLocationId(rawLocation), // SMART LOOKUP
+            awakeningsCount: row.length > 7 ? _parseInt(row[7]) : 0,
+            awakeDurationMinutes: row.length > 8 ? _parseInt(row[8]) : 0,
+          );
         }
 
-        DateTime bed = parseT(row[1].toString());
-        DateTime asleep = parseT(row[2].toString());
-        DateTime wake = parseT(row[3].toString());
-        DateTime? out = row[4].toString().trim().isNotEmpty ? parseT(row[4].toString()) : null;
-
-        // Ensure logical order if parsing failed or heuristic failed
-        // e.g. Asleep before Bed? Add day to Asleep.
-        if (asleep.isBefore(bed)) asleep = asleep.add(const Duration(days: 1));
-        if (wake.isBefore(asleep)) wake = wake.add(const Duration(days: 1));
-        if (out != null && out.isBefore(wake)) out = out.add(const Duration(days: 1));
-
-        SleepEntry newEntry = SleepEntry(
-          bedTime: bed,
-          fellAsleepTime: asleep,
-          wakeTime: wake,
-          outOfBedTime: out,
-          // Handle dynamic row length safely
-          sleepLocationId: row.length > 9 ? row[9].toString().trim() : 'bed', 
-          // Use helper to parse ints safely from CSV cells
-          awakeningsCount: row.length > 7 ? _parseInt(row[7]) : 0,
-          awakeDurationMinutes: row.length > 8 ? _parseInt(row[8]) : 0,
-        );
-
-        // Check for duplicates
+        // Deduplication
         bool exists = log.sleepLog.any((e) =>
-          _isSameMinute(e.bedTime, newEntry.bedTime) &&
-          _isSameMinute(e.wakeTime, newEntry.wakeTime)
+          e.bedTime.year == newEntry.bedTime.year &&
+          e.bedTime.minute == newEntry.bedTime.minute &&
+          e.wakeTime.minute == newEntry.wakeTime.minute
         );
 
         if (!exists) {
@@ -622,55 +806,6 @@ This export contains your sleep tracking data in a structured folder format.
         }
       } catch (e) {
         debugPrint("Error import sleep row $i: $e");
-      }
-    }
-    return count;
-  }
-
-// Method to import main daily log (for restoring day types and notes, which are not in the other logs)
-  Future<int> _importMainDailyLog(List<List<dynamic>> rows) async {
-    int count = 0;
-    // Get all categories so we can match names (e.g. "Work") back to IDs (e.g. "work")
-    final dayTypes = await CategoryManager().getCategories('day_types');
-
-    // Start at i=1 to skip headers
-    for (int i = 1; i < rows.length; i++) {
-      var row = rows[i];
-      if (row.length < 2) continue; // Skip empty rows
-
-      try {
-        // 1. Parse Date (Column 0)
-        DateTime date = DateTime.parse(row[0].toString().trim());
-        DateTime utcDate = DateTime.utc(date.year, date.month, date.day);
-        
-        // 2. Get existing log or create new one
-        DailyLog log = await getDailyLog(utcDate);
-
-        // 3. Restore Day Type (Column 1)
-        String dayTypeName = row[1].toString().trim();
-        if (dayTypeName.isNotEmpty) {
-          // Find the ID that matches this name
-          final matchedCategory = dayTypes.where((c) => c.name.toLowerCase() == dayTypeName.toLowerCase()).firstOrNull;
-          if (matchedCategory != null) {
-            log.dayTypeId = matchedCategory.id;
-          }
-        }
-
-        // 4. Restore Notes (Column 8 based on your CSV structure)
-        // Header: Date, Day Type, Total Sleep, Latency, Awakenings, Awake Dur, Out Bed, Sessions, Notes
-        // Index:  0     1         2            3        4           5          6        7         8
-        if (row.length > 8) {
-          String notes = row[8].toString().trim();
-          if (notes.isNotEmpty) {
-            log.notes = notes;
-          }
-        }
-
-        // 5. Save
-        await saveDailyLog(utcDate, log);
-        count++;
-      } catch (e) {
-        debugPrint("Error importing main log row $i: $e");
       }
     }
     return count;
@@ -687,14 +822,12 @@ This export contains your sleep tracking data in a structured folder format.
         String dosage;
         DateTime time;
         if (row.length == 5) {
-        // Parse time column (Index 3)
-        medType = row[2].toString().trim(); // ID is at index 2
+           medType = row[2].toString().trim();
            dosage = row[3].toString().trim();
            final parts = row[4].toString().trim().split(':');
            time = DateTime(date.year, date.month, date.day, int.parse(parts[0]), int.parse(parts[1]));
         } else {
-           // Old Format
-           medType = row[1].toString().trim(); // ID was at index 1
+           medType = row[1].toString().trim();
            dosage = row[2].toString().trim();
            final parts = row[3].toString().trim().split(':');
            time = DateTime(date.year, date.month, date.day, int.parse(parts[0]), int.parse(parts[1]));
