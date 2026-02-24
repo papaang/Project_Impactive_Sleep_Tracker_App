@@ -1,5 +1,5 @@
 name: sleep_draft_three
-description: "A Flutter-based sleep tracking app designed for monitoring sleep patterns, logging daily activities (such as caffeine intake, exercise, medication), analyzing correlations between activities and sleep quality, and exporting data for further analysis."
+description: "A Flutter-based sleep diary app designed for monitoring sleep patterns, logging daily activities (such as caffeine intake, exercise, medication), analyzing correlations between activities and sleep quality, and exporting data for further analysis."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 2.2.0
+version: 2.3.0
 
 environment:
   sdk: ^3.9.2
@@ -60,6 +60,21 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  image_path: "assets/Sleep_Diar💤 icon_iOS.png"
+  ios: true
+  image_path_ios: "assets/Sleep_Diar💤 icon_iOS.png"
+  android: true
+  adaptive_icon_background: "assets/Sleep_Diar💤_icon_background.png"
+  adaptive_icon_foreground: "assets/Sleep_Diar💤 icon_foreground.png"
+  min_sdk_android: 21
+  web:
+    generate: true
+    image_path: "assets/Sleep_Diar💤 icon_iOS.png"
+    background_color: "#190F2E" # Matches your dark purple sky
+    theme_color: "#190F2E"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
