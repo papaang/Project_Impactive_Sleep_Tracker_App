@@ -3,6 +3,11 @@ import 'dart:ui' as ui; // Added to resolve TextDirection
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../log_service.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 
 class SleepEfficiencyScreen extends StatefulWidget {
   const SleepEfficiencyScreen({super.key});
@@ -80,6 +85,89 @@ class _SleepEfficiencyScreenState extends State<SleepEfficiencyScreen> {
       _isLoading = false;
     });
   }
+  
+  Future<void> _exportPdf() async {
+    if (_timeInBedData.isEmpty) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Generating PDF...')));
+
+    try {
+      final pdf = pw.Document();
+      final double paddingLeft = 50.0;
+      final double paddingRight = 40.0;
+      final double graphWidth = max(800.0, _timeInBedData.length * 50.0);
+      final double totalWidth = paddingLeft + graphWidth + paddingRight;
+      final double totalHeight = 500.0;
+      final double graphH = totalHeight - 150.0;
+
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, totalWidth, totalHeight));
+
+      canvas.drawRect(Rect.fromLTWH(0, 0, totalWidth, totalHeight), Paint()..color = Colors.white);
+
+      final textPainter = TextPainter(textDirection: ui.TextDirection.ltr, textAlign: TextAlign.center);
+      textPainter.text = const TextSpan(text: "Sleep Efficiency Trend", style: TextStyle(color: Colors.black, fontSize: 24, fontWeight: FontWeight.bold));
+      textPainter.layout();
+      textPainter.paint(canvas, Offset((totalWidth - textPainter.width) / 2, 30));
+
+      // FIX: Draw Y-Axis Grid (0 to 100%)
+      canvas.save();
+      canvas.translate(0, 100);
+      final paintGrid = Paint()..color = Colors.grey.withAlpha(51)..strokeWidth = 1;
+      for (int i = 0; i <= 5; i++) {
+        double val = i * 20.0; // Grid lines at 0, 20, 40, 60, 80, 100
+        double y = graphH - (val / 100.0) * graphH;
+        canvas.drawLine(Offset(paddingLeft, y), Offset(totalWidth, y), paintGrid);
+        
+        textPainter.text = TextSpan(text: "${val.toInt()}%", style: const TextStyle(color: Colors.grey, fontSize: 12));
+        textPainter.layout();
+        textPainter.paint(canvas, Offset(paddingLeft - textPainter.width - 8, y - textPainter.height / 2));
+      }
+      canvas.restore();
+
+      // FIX: Scale the data so "Time In Bed" is exactly 100% of the bar
+      Map<DateTime, double> scaledBed = {};
+      Map<DateTime, double> scaledSleep = {};
+      for (var d in _timeInBedData.keys) {
+        scaledBed[d] = 100.0; 
+        scaledSleep[d] = _efficiencyData[d]!;
+      }
+
+      // Draw the Custom Painter
+      canvas.save();
+      canvas.translate(paddingLeft, 100);
+      EfficiencyGraphPainter(
+        dates: _timeInBedData.keys.toList(),
+        bedData: scaledBed, // Scaled to 100%
+        sleepData: scaledSleep, // Efficiency %
+        efficiencyData: _efficiencyData,
+        isDark: false,
+        forcedMax: 100.0 // Force max bound to 100
+      ).paint(canvas, Size(graphWidth, graphH));
+      canvas.restore();
+
+      final picture = recorder.endRecording();
+      final image = await picture.toImage(totalWidth.toInt(), totalHeight.toInt());
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+
+      if (byteData != null) {
+        pdf.addPage(pw.Page(
+          pageFormat: PdfPageFormat(totalWidth, totalHeight),
+          margin: pw.EdgeInsets.zero,
+          build: (context) => pw.Image(pw.MemoryImage(byteData.buffer.asUint8List())),
+        ));
+      }
+
+      final directory = await getTemporaryDirectory();
+      String safeName = _logService.userName.trim().replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
+      String fileName = safeName.isNotEmpty ? '${safeName}_Efficiency_Report.pdf' : 'Efficiency_Report.pdf';
+      final file = File('${directory.path}/$fileName');
+      
+      await file.writeAsBytes(await pdf.save());
+      if (mounted) Share.shareXFiles([XFile(file.path)], text: 'Sleep Efficiency Report');
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -89,6 +177,9 @@ class _SleepEfficiencyScreenState extends State<SleepEfficiencyScreen> {
       appBar: AppBar(
         title: const Text('Sleep Efficiency'),
         centerTitle: true,
+        actions: [
+          IconButton(icon: const Icon(Icons.picture_as_pdf), onPressed: _exportPdf, tooltip: "Export PDF"),
+        ],
       ),
       body: _isLoading 
         ? const Center(child: CircularProgressIndicator())
@@ -185,13 +276,15 @@ class EfficiencyGraphPainter extends CustomPainter {
   final Map<DateTime, double> sleepData;
   final Map<DateTime, double> efficiencyData;
   final bool isDark;
+  final double? forcedMax;
 
   EfficiencyGraphPainter({
     required this.dates, 
     required this.bedData, 
     required this.sleepData, 
     required this.efficiencyData, 
-    required this.isDark
+    required this.isDark,
+    this.forcedMax
   });
 
   @override
@@ -210,10 +303,14 @@ class EfficiencyGraphPainter extends CustomPainter {
     
     // Find Max Hours for scaling
     double maxHours = 0;
-    for (var v in bedData.values) {
-      if (v > maxHours) maxHours = v;
-    }
-    maxHours = max(maxHours + 1, 10); // Minimum 10h scale, add buffer
+if (forcedMax != null) { // FIX: Allow PDF to force the max bound to 100
+      maxHours = forcedMax!;
+    } else {
+      for (var v in bedData.values) {
+        if (v > maxHours) maxHours = v;
+      }
+      maxHours = max(maxHours + 1, 10);
+    } // Minimum 10h scale, add buffer
 
     final paintGrey = Paint()..color = isDark ? Colors.grey[800]! : Colors.grey[300]!;
     final paintSleep = Paint()..color = Colors.indigo;

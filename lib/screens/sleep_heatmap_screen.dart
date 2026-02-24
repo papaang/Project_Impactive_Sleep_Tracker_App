@@ -2,6 +2,11 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../log_service.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 
 class SleepHeatmapScreen extends StatefulWidget {
   const SleepHeatmapScreen({super.key});
@@ -134,6 +139,9 @@ class _SleepHeatmapScreenState extends State<SleepHeatmapScreen> {
       appBar: AppBar(
         title: const Text('Sleep Consistency'),
         centerTitle: true,
+        actions: [
+          IconButton(icon: const Icon(Icons.picture_as_pdf), onPressed: _exportPdf, tooltip: "Export PDF"),
+        ],
       ),
       body: _isLoading
         ? const Center(child: CircularProgressIndicator())
@@ -251,6 +259,69 @@ class _SleepHeatmapScreenState extends State<SleepHeatmapScreen> {
             },
           ),
     );
+  }
+
+  Future<void> _exportPdf() async {
+    if (_sleepData.isEmpty) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Generating PDF...')));
+
+    try {
+      final pdf = pw.Document();
+      
+      const double cellSize = 32.0;
+      const double gap = 6.0;
+      const double labelWidth = 50.0;
+      final double gridWidth = 7 * (cellSize + gap) + labelWidth;
+      final double gridHeight = _totalWeeks * (cellSize + gap);
+      
+      final double totalWidth = gridWidth + 100; // Adding padding
+      final double totalHeight = gridHeight + 150; // Padding + Title
+
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, totalWidth, totalHeight));
+
+      canvas.drawRect(Rect.fromLTWH(0, 0, totalWidth, totalHeight), Paint()..color = Colors.white);
+
+      final textPainter = TextPainter(textDirection: ui.TextDirection.ltr, textAlign: TextAlign.center);
+      textPainter.text = const TextSpan(text: "Yearly Sleep Consistency", style: TextStyle(color: Colors.black, fontSize: 24, fontWeight: FontWeight.bold));
+      textPainter.layout();
+      textPainter.paint(canvas, Offset((totalWidth - textPainter.width) / 2, 30));
+
+      canvas.save();
+      canvas.translate(50, 100); // Center grid slightly
+      CalendarHeatmapPainter(
+        startDate: _startDate,
+        totalWeeks: _totalWeeks,
+        data: _sleepData,
+        isDark: false, // Print mode
+        cellSize: cellSize,
+        gap: gap,
+        labelWidth: labelWidth
+      ).paint(canvas, Size(gridWidth, gridHeight));
+      canvas.restore();
+
+      final picture = recorder.endRecording();
+      final image = await picture.toImage(totalWidth.toInt(), totalHeight.toInt());
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+
+      if (byteData != null) {
+        pdf.addPage(pw.Page(
+          pageFormat: PdfPageFormat(totalWidth, totalHeight),
+          margin: pw.EdgeInsets.zero,
+          build: (context) => pw.Image(pw.MemoryImage(byteData.buffer.asUint8List())),
+        ));
+      }
+
+      final directory = await getTemporaryDirectory();
+      String safeName = _logService.userName.trim().replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
+      String fileName = safeName.isNotEmpty ? '${safeName}_Yearly_Sleep_Consistency_Heatmap.pdf' : 'Yearly_Sleep_Consistency_Heatmap.pdf';
+      final file = File('${directory.path}/$fileName');
+      
+      await file.writeAsBytes(await pdf.save());
+      if (mounted) Share.shareXFiles([XFile(file.path)], text: 'Yearly Heatmap Report');
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
+    }
   }
 }
 

@@ -12,3 +12,7 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+
+# Temporarily disable web files from being tracked, as they are not yet in active development.
+/web/
+/web_test/

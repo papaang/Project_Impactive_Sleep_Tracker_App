@@ -1,6 +1,11 @@
 import 'dart:ui' as ui; // Added to resolve TextDirection
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:pdf/pdf.dart'; // NEW to V2.2.0
+import 'package:pdf/widgets.dart' as pw; // NEW to V2.2.0
 import '../models.dart';
 import '../log_service.dart';
 import 'event_screen.dart';
@@ -188,6 +193,182 @@ class _SleepGraphScreenState extends State<SleepGraphScreen> {
     ScaffoldMessenger.of(context).showSnackBar(snackBar);
   }
 
+Future<void> _exportGraph() async {
+    if (_logs.isEmpty) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Generating PDF Report...'), duration: Duration(seconds: 2)),
+    );
+
+    try {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final sortedKeys = _logs.keys.toList()..sort((a, b) => b.compareTo(a));
+      final displayDates = sortedKeys.where((d) => !d.isAfter(today.add(const Duration(days: 1)))).toList();
+
+      if (displayDates.isEmpty) return;
+
+      // 1. Group dates by Month and Year
+      final Map<String, List<DateTime>> months = {};
+      for (var date in displayDates) {
+        String monthKey = DateFormat('MMMM yyyy').format(date); // e.g., "January 2026"
+        if (!months.containsKey(monthKey)) months[monthKey] = [];
+        months[monthKey]!.add(date);
+      }
+
+      // 2. Initialize the PDF Document
+      final pdf = pw.Document();
+
+      // 3. Process each month as a separate page
+      for (var monthEntry in months.entries) {
+        final monthName = monthEntry.key;
+        final monthDates = monthEntry.value;
+
+        // Calculate dimensions for this specific month's page
+        final double headerHeight = 40.0;
+        final double titleHeight = 60.0; // Space for the month title
+        final double totalWidth = _dateColWidth + _typeColWidth + _graphWidth;
+        final double totalHeight = titleHeight + headerHeight + (monthDates.length * _rowHeight);
+
+        // Setup the invisible canvas
+        final recorder = ui.PictureRecorder();
+        final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, totalWidth, totalHeight));
+        
+        // FORCE LIGHT MODE for PDFs (looks much better when printed)
+        final bool isDark = false; 
+        canvas.drawRect(Rect.fromLTWH(0, 0, totalWidth, totalHeight), Paint()..color = Colors.white);
+
+        final textPainter = TextPainter(textDirection: ui.TextDirection.ltr, textAlign: TextAlign.center);
+
+        // Draw Month Title at the top
+        textPainter.text = TextSpan(
+          text: monthName, 
+          style: const TextStyle(color: Colors.black, fontSize: 24, fontWeight: FontWeight.bold)
+        );
+        textPainter.layout();
+        textPainter.paint(canvas, Offset((totalWidth - textPainter.width) / 2, (titleHeight - textPainter.height) / 2));
+
+        // Draw Header (Date | Type | 00:00 ...)
+        double currentY = titleHeight;
+        textPainter.text = const TextSpan(text: "Date", style: TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold));
+        textPainter.layout(maxWidth: _dateColWidth);
+        textPainter.paint(canvas, Offset((_dateColWidth - textPainter.width) / 2, currentY + (headerHeight - textPainter.height) / 2));
+
+        textPainter.text = const TextSpan(text: "Type", style: TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold));
+        textPainter.layout(maxWidth: _typeColWidth);
+        textPainter.paint(canvas, Offset(_dateColWidth + (_typeColWidth - textPainter.width) / 2, currentY + (headerHeight - textPainter.height) / 2));
+
+        canvas.save();
+        canvas.translate(_dateColWidth + _typeColWidth, currentY);
+        GraphHeaderPainter(hourWidth: _hourWidth, isDark: isDark).paint(canvas, Size(_graphWidth, headerHeight));
+        canvas.restore();
+
+        currentY += headerHeight;
+        canvas.drawLine(Offset(0, currentY), Offset(totalWidth, currentY), Paint()..color = Colors.black..strokeWidth = 1.5);
+
+        // Draw Rows for this month
+        final dividerPaint = Paint()..color = Colors.grey.withAlpha(80)..strokeWidth = 1;
+
+        for (var date in monthDates) {
+          final log = _logs[date];
+          final dayType = log != null && log.dayTypeId != null ? _dayTypes[log.dayTypeId] : null;
+
+          // Draw Date
+          textPainter.text = TextSpan(text: DateFormat('dd/MM').format(date), style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 15.0));
+          textPainter.layout(maxWidth: _dateColWidth);
+          textPainter.paint(canvas, Offset((_dateColWidth - textPainter.width) / 2, currentY + _rowHeight / 2 - textPainter.height));
+
+          textPainter.text = TextSpan(text: DateFormat('EEE').format(date), style: TextStyle(color: Colors.grey[800], fontSize: 16.0));
+          textPainter.layout(maxWidth: _dateColWidth);
+          textPainter.paint(canvas, Offset((_dateColWidth - textPainter.width) / 2, currentY + _rowHeight / 2));
+
+          // Draw Day Type Icon
+          if (dayType != null) {
+            textPainter.text = TextSpan(
+              text: String.fromCharCode(dayType.icon.codePoint),
+              style: TextStyle(fontSize: 20.0, fontFamily: dayType.icon.fontFamily, package: dayType.icon.fontPackage, color: dayType.color),
+            );
+            textPainter.layout();
+            textPainter.paint(canvas, Offset(_dateColWidth + (_typeColWidth - textPainter.width) / 2, currentY + (_rowHeight - textPainter.height) / 2));
+          }
+
+          // Draw the Graph Data
+          canvas.save();
+          canvas.translate(_dateColWidth + _typeColWidth, currentY);
+
+          List<DailyLog> rowLogs = [];
+          if (_logs[date.subtract(const Duration(days: 1))] != null) rowLogs.add(_logs[date.subtract(const Duration(days: 1))]!);
+          if (_logs[date] != null) rowLogs.add(_logs[date]!);
+          if (_logs[date.add(const Duration(days: 1))] != null) rowLogs.add(_logs[date.add(const Duration(days: 1))]!);
+
+          GraphBackgroundPainter(logs: rowLogs, rowDate: date, hourWidth: _hourWidth, isDark: isDark).paint(canvas, Size(_graphWidth, _rowHeight));
+
+          final rowPainter = GraphRowPainter(logs: rowLogs, rowDate: date, hourWidth: _hourWidth, isDark: isDark, medicationTypes: _medicationTypes, rowHeight: _rowHeight);
+          for (var symbolData in rowPainter.getSymbols()) {
+            if (symbolData.symbol.icon != null) {
+              textPainter.text = TextSpan(
+                text: String.fromCharCode(symbolData.symbol.icon!.codePoint),
+                style: TextStyle(fontSize: 24.0, fontFamily: symbolData.symbol.icon!.fontFamily, package: symbolData.symbol.icon!.fontPackage, color: symbolData.symbol.color),
+              );
+            } else {
+              textPainter.text = TextSpan(text: symbolData.symbol.text ?? '', style: TextStyle(color: symbolData.symbol.color, fontWeight: FontWeight.bold, fontSize: 20));
+            }
+            textPainter.layout();
+            textPainter.paint(canvas, Offset(symbolData.x, symbolData.y));
+          }
+          canvas.restore();
+
+          currentY += _rowHeight;
+          canvas.drawLine(Offset(0, currentY), Offset(totalWidth, currentY), dividerPaint);
+        }
+
+        // Convert Canvas to Image Bytes
+        final picture = recorder.endRecording();
+        final image = await picture.toImage(totalWidth.toInt(), totalHeight.toInt());
+        final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+
+        // Add Image as a new PDF Page
+        if (byteData != null) {
+          final pdfImage = pw.MemoryImage(byteData.buffer.asUint8List());
+          
+          pdf.addPage(pw.Page(
+            pageFormat: PdfPageFormat(totalWidth, totalHeight), // Custom page size so it doesn't squish!
+            margin: pw.EdgeInsets.zero,
+            build: (pw.Context context) {
+              return pw.Image(pdfImage);
+            }
+          ));
+        }
+      }
+
+      // 4. Save and Share the PDF
+      final directory = await getTemporaryDirectory();
+      // --- Dynamic Filename Logic (uses the patient's name) ---
+      String userName = _logService.userName.trim();
+      
+      // Sanitize the name to prevent file-saving errors 
+      // (Replaces spaces with underscores, removes special characters)
+      String safeName = userName.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_'); 
+      
+      // Create the filename: Use the alias if it exists, otherwise use a default
+      String fileName = safeName.isNotEmpty 
+          ? '${safeName}_Sleep_Diary_Export.pdf' 
+          : 'Sleep_Diary_Export.pdf';
+
+      final file = File('${directory.path}/$fileName');
+      await file.writeAsBytes(await pdf.save());
+
+      if (mounted) {
+        Share.shareXFiles([XFile(file.path)], text: 'My Sleep Diary Report');
+      }
+
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to export: $e')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // Sort dates: Newest at Top (index 0).
@@ -216,7 +397,7 @@ class _SleepGraphScreenState extends State<SleepGraphScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sleep Progress Graph'),
+        title: const Text('Sleep Diary Daily Overview'),
         centerTitle: true,
         actions: [
           IconButton(
@@ -228,6 +409,11 @@ class _SleepGraphScreenState extends State<SleepGraphScreen> {
             icon: const Icon(Icons.zoom_in),
             onPressed: _zoomIn,
             tooltip: "Zoom In",
+          ),
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf), // Added a PDF icon!
+            onPressed: _exportGraph,
+            tooltip: "Export as PDF",
           ),
         ],
       ),

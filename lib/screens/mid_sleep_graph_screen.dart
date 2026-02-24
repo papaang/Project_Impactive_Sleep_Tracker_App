@@ -4,6 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models.dart';
 import '../log_service.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 
 class MidSleepGraphScreen extends StatefulWidget {
   const MidSleepGraphScreen({super.key});
@@ -65,6 +70,101 @@ class _MidSleepGraphScreenState extends State<MidSleepGraphScreen> {
     });
   }
 
+Future<void> _exportPdf() async {
+    if (_dataPoints.isEmpty) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Generating PDF...')));
+
+    try {
+      final pdf = pw.Document();
+      final sortedDates = _dataPoints.keys.toList()..sort();
+      
+      final double paddingLeft = 60.0;
+      final double paddingRight = 40.0; 
+      final double graphWidth = max(800.0, sortedDates.length * 50.0);
+      final double totalWidth = paddingLeft + graphWidth + paddingRight;
+      final double totalHeight = 550.0; 
+      final double graphH = totalHeight - 180;
+
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, totalWidth, totalHeight));
+
+      canvas.drawRect(Rect.fromLTWH(0, 0, totalWidth, totalHeight), Paint()..color = Colors.white);
+
+      final textPainter = TextPainter(textDirection: ui.TextDirection.ltr, textAlign: TextAlign.center);
+      textPainter.text = const TextSpan(text: "Circadian Drift (Mid-Sleep Point)", style: TextStyle(color: Colors.black, fontSize: 24, fontWeight: FontWeight.bold));
+      textPainter.layout();
+      textPainter.paint(canvas, Offset((totalWidth - textPainter.width) / 2, 30));
+
+      // FIX: Anchor Y-Axis from Noon (-12.0) to Noon (12.0), centering on Midnight (0.0)
+      double minH = -12.0;
+      double maxH = 12.0;
+
+      // Draw Y-Axis
+      canvas.save();
+      canvas.translate(0, 100);
+      YAxisPainter(minH: minH, maxH: maxH, graphH: graphH, isDark: false).paint(canvas, Size(paddingLeft, graphH));
+      canvas.restore();
+
+      // Draw Graph
+      canvas.save();
+      canvas.translate(paddingLeft, 100);
+      GraphPainter(
+        dates: sortedDates, data: _dataPoints, isDark: false, 
+        minH: minH, maxH: maxH, graphH: graphH, padding: paddingLeft
+      ).paint(canvas, Size(graphWidth, graphH));
+      canvas.restore();
+
+      // FIX: Calculate Average Mid-Sleep properly handling negative (pre-midnight) numbers
+      double sum = 0;
+      int count = 0;
+      _dataPoints.forEach((_, val) { sum += val; count++; });
+      if (count > 0) {
+        double avg = sum / count;
+        
+        // Convert the math value back to standard 24h format for the text label
+        double time24 = avg;
+        if (time24 < 0) time24 += 24.0;
+        
+        int h = time24.floor();
+        int m = ((time24 - h) * 60).round();
+        if (m == 60) { h += 1; m = 0; } // Handle rounding overflow
+        if (h >= 24) h = 0;
+        
+        String period = h >= 12 ? 'PM' : 'AM';
+        int displayH = h % 12;
+        if (displayH == 0) displayH = 12;
+        
+        String timeStr = "Average Mid-Sleep: ${displayH.toString().padLeft(2,'0')}:${m.toString().padLeft(2,'0')} $period";
+
+        textPainter.text = TextSpan(text: timeStr, style: const TextStyle(color: Colors.indigo, fontSize: 18, fontWeight: FontWeight.bold));
+        textPainter.layout();
+        textPainter.paint(canvas, Offset((totalWidth - textPainter.width) / 2, totalHeight - 50));
+      }
+
+      final picture = recorder.endRecording();
+      final image = await picture.toImage(totalWidth.toInt(), totalHeight.toInt());
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+
+      if (byteData != null) {
+        pdf.addPage(pw.Page(
+          pageFormat: PdfPageFormat(totalWidth, totalHeight),
+          margin: pw.EdgeInsets.zero,
+          build: (context) => pw.Image(pw.MemoryImage(byteData.buffer.asUint8List())),
+        ));
+      }
+
+      final directory = await getTemporaryDirectory();
+      String safeName = _logService.userName.trim().replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
+      String fileName = safeName.isNotEmpty ? '${safeName}_Circadian_Drift_Report.pdf' : 'Circadian_Drift_Report.pdf';
+      final file = File('${directory.path}/$fileName');
+      
+      await file.writeAsBytes(await pdf.save());
+      if (mounted) Share.shareXFiles([XFile(file.path)], text: 'Circadian Drift Report');
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
+    }
+  }
+  
   @override
   Widget build(BuildContext context) {
     final sortedDates = _dataPoints.keys.toList()..sort();
@@ -74,6 +174,9 @@ class _MidSleepGraphScreenState extends State<MidSleepGraphScreen> {
       appBar: AppBar(
         title: const Text('Circadian Drift'),
         centerTitle: true,
+        actions: [
+          IconButton(icon: const Icon(Icons.picture_as_pdf), onPressed: _exportPdf, tooltip: "Export PDF"),
+        ],
       ),
       body: SafeArea( 
         child: _isLoading 

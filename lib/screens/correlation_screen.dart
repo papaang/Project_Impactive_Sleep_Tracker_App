@@ -24,6 +24,11 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../models.dart';
 import '../log_service.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 
 class CorrelationScreen extends StatefulWidget {
   const CorrelationScreen({super.key});
@@ -54,6 +59,64 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
   void initState() {
     super.initState();
     _loadData();
+  }
+
+Future<void> _exportPdf() async {
+    if (_points.isEmpty) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Generating PDF...')));
+
+    try {
+      final pdf = pw.Document();
+      final double totalWidth = 800.0;
+      final double totalHeight = 500.0;
+
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, totalWidth, totalHeight));
+
+      // Force Light Mode for Print
+      canvas.drawRect(Rect.fromLTWH(0, 0, totalWidth, totalHeight), Paint()..color = Colors.white);
+
+      final textPainter = TextPainter(textDirection: ui.TextDirection.ltr, textAlign: TextAlign.center);
+      textPainter.text = const TextSpan(text: "Habits vs. Sleep Latency", style: TextStyle(color: Colors.black, fontSize: 24, fontWeight: FontWeight.bold));
+      textPainter.layout();
+      textPainter.paint(canvas, Offset((totalWidth - textPainter.width) / 2, 30));
+
+      // Draw the Custom Painter
+      canvas.save();
+      canvas.translate(0, 100);
+      ScatterPlotPainter(_points, false).paint(canvas, Size(totalWidth, totalHeight - 180));
+      canvas.restore();
+
+      // Draw Legend manually for the PDF
+      textPainter.text = const TextSpan(
+        text: "Legend:   Caffeine (Brown)   |   Alcohol (Purple)   |   Exercise (Orange)   |   Medication (Blue)",
+        style: TextStyle(color: Colors.black, fontSize: 14, fontWeight: FontWeight.bold)
+      );
+      textPainter.layout();
+      textPainter.paint(canvas, Offset((totalWidth - textPainter.width) / 2, totalHeight - 50));
+
+      final picture = recorder.endRecording();
+      final image = await picture.toImage(totalWidth.toInt(), totalHeight.toInt());
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+
+      if (byteData != null) {
+        pdf.addPage(pw.Page(
+          pageFormat: PdfPageFormat(totalWidth, totalHeight),
+          margin: pw.EdgeInsets.zero,
+          build: (context) => pw.Image(pw.MemoryImage(byteData.buffer.asUint8List())),
+        ));
+      }
+
+      final directory = await getTemporaryDirectory();
+      String safeName = _logService.userName.trim().replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
+      String fileName = safeName.isNotEmpty ? '${safeName}_Sleep_Habits_Report.pdf' : 'Sleep_Habits_Report.pdf';
+      final file = File('${directory.path}/$fileName');
+      
+      await file.writeAsBytes(await pdf.save());
+      if (mounted) Share.shareXFiles([XFile(file.path)], text: 'Habits Report');
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
+    }
   }
 
   Future<void> _loadData() async {
@@ -184,7 +247,10 @@ class _CorrelationScreenState extends State<CorrelationScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Habits vs. Sleep Latency")),
+      appBar: AppBar(title: const Text("Habits vs. Sleep Latency"),
+      actions: [
+          IconButton(icon: const Icon(Icons.picture_as_pdf), onPressed: _exportPdf, tooltip: "Export PDF"),
+        ],),
       body: SafeArea( // Wrapped in SafeArea
         child: _isLoading 
         ? const Center(child: CircularProgressIndicator())

@@ -3,6 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../log_service.dart';
+import 'dart:ui' as ui;
+import 'dart:io';
+import 'package:flutter/rendering.dart'; // Needed for RepaintBoundary
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 
 class StatsScreen extends StatefulWidget {
   const StatsScreen({super.key});
@@ -13,6 +20,9 @@ class StatsScreen extends StatefulWidget {
 
 class _StatsScreenState extends State<StatsScreen> {
   final LogService _logService = LogService();
+
+  // Key to capture the screen
+  final GlobalKey _printKey = GlobalKey();
 
   // Data: Date -> Hours of ACTUAL sleep (split correctly across days)
   Map<DateTime, double> _weeklySleepData = {};
@@ -259,6 +269,43 @@ class _StatsScreenState extends State<StatsScreen> {
     }
   }
 
+Future<void> _exportPdf() async {
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Generating PDF...')));
+    
+    try {
+      // 1. Give the UI a tiny moment to ensure animations are finished
+      await Future.delayed(const Duration(milliseconds: 200)); 
+
+      // 2. Find the RepaintBoundary in the UI and take a high-res screenshot
+      RenderRepaintBoundary boundary = _printKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+      ui.Image image = await boundary.toImage(pixelRatio: 3.0); // 3.0 makes it super crisp!
+      var byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) return;
+
+      // 3. Put the screenshot into a PDF page
+      final pdf = pw.Document();
+      final imageProvider = pw.MemoryImage(byteData.buffer.asUint8List());
+
+      pdf.addPage(pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Center(child: pw.Image(imageProvider));
+        },
+      ));
+
+      // 4. Save and share
+      final directory = await getTemporaryDirectory();
+      String safeName = _logService.userName.trim().replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
+      String fileName = safeName.isNotEmpty ? '${safeName}_Stats_Report.pdf' : 'Stats_Report.pdf';
+      final file = File('${directory.path}/$fileName');
+      
+      await file.writeAsBytes(await pdf.save());
+      if (mounted) Share.shareXFiles([XFile(file.path)], text: 'Sleep Statistics Report');
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -269,17 +316,20 @@ class _StatsScreenState extends State<StatsScreen> {
       appBar: AppBar(
         title: const Text('Sleep Statistics'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.calendar_today),
-            onPressed: _selectDateRange,
-          ),
+          IconButton(icon: const Icon(Icons.picture_as_pdf), onPressed: _exportPdf, tooltip: "Export PDF"),
+          IconButton(icon: const Icon(Icons.calendar_today), onPressed: _selectDateRange),
         ],
       ),
-      body: _isLoading
+body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
+          // ---> THIS IS THE NEW WRAPPER <---
+          : RepaintBoundary(
+              key: _printKey,
+              child: Container(
+                color: Theme.of(context).scaffoldBackgroundColor, // Gives the PDF a background color
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Column(
@@ -563,10 +613,12 @@ class _StatsScreenState extends State<StatsScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
-                ],
-              ),
-            ),
-    );
-  }
+const SizedBox(height: 20),
+                ], // Closes children list
+              ), // Closes Column
+            ), // Closes Padding
+          ), // Closes Container
+        ), // Closes RepaintBoundary
+    ); // Closes Scaffold
+  } // Closes build method
 }
